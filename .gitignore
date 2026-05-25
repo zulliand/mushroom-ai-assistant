@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+data/images/
+data/train/
+data/val/
+data/test/

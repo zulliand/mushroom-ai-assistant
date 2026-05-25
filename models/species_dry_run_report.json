@@ -1,0 +1,1018 @@
+{
+  "summary": {
+    "roots": [
+      "data\\train",
+      "data\\val",
+      "data\\test"
+    ],
+    "total_images": 2820,
+    "detected_species_count": 46,
+    "unknown_filename_pattern_images": 60,
+    "threshold_for_too_few": 20,
+    "species_with_enough_images": 46,
+    "feasible_species_training": true,
+    "dry_run_only": true,
+    "target_layout_root": "data\\species"
+  },
+  "top10": [
+    {
+      "species": "Agaricus_bisporus",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Agaricus_subrufescens",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_bisporigera",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_muscaria",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_ocreata",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_phalloides",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_smithiana",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_verna",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_virosa",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Auricularia_auricula",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    }
+  ],
+  "species_with_too_few_images": [],
+  "all_species": [
+    {
+      "species": "Agaricus_bisporus",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Agaricus_subrufescens",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_bisporigera",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_muscaria",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_ocreata",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_phalloides",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_smithiana",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_verna",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Amanita_virosa",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Auricularia_auricula",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Boletus_edulis",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Cantharellus_cibarius",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Clitocybe_dealbata",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Conocybe_filaris",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Coprinus_comatus",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Cordyceps_sinensis",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Cortinarius_rubellus",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Entoloma_sinuatum",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Flammulina_velutipes",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Galerina_marginata",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Ganoderma_lucidum",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Grifola_frondosa",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Gyromitra_esculenta",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Hericium_erinaceus",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Hydnum_repandum",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Hypholoma_fasciculare",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Inocybe_erubescens",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Lentinula_edodes",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Lepiota_brunneoincarnata",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Macrolepiota_procera",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Morchella_esculenta",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Omphalotus_olearius",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Paxillus_involutus",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Pholiota_nameko",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Pleurotus_citrinopileatus",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Pleurotus_eryngii",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Pleurotus_ostreatus",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Psilocybe_semilanceata",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Rhodophyllus_rhodopolius",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Russula_emetica",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Russula_virescens",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Scleroderma_citrinum",
+      "total": 60,
+      "label": "poisonous",
+      "edible_count": 0,
+      "poisonous_count": 60,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Suillus_luteus",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Tremella_fuciformis",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Tricholoma_matsutake",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    },
+    {
+      "species": "Tuber_melanosporum",
+      "total": 60,
+      "label": "edible",
+      "edible_count": 60,
+      "poisonous_count": 0,
+      "unknown_label_count": 0,
+      "train_count": 48,
+      "val_count": 6,
+      "test_count": 6
+    }
+  ],
+  "unknown_files_sample": [
+    "data\\train\\edible\\Truffles_000001_0.jpg",
+    "data\\train\\edible\\Truffles_000001_1.jpg",
+    "data\\train\\edible\\Truffles_000002_0.jpg",
+    "data\\train\\edible\\Truffles_000002_1.jpg",
+    "data\\train\\edible\\Truffles_000003_0.jpg",
+    "data\\train\\edible\\Truffles_000003_1.jpg",
+    "data\\train\\edible\\Truffles_000004_0.jpg",
+    "data\\train\\edible\\Truffles_000005_0.jpg",
+    "data\\train\\edible\\Truffles_000005_1.jpg",
+    "data\\train\\edible\\Truffles_000006_0.jpg",
+    "data\\train\\edible\\Truffles_000007_1.jpg",
+    "data\\train\\edible\\Truffles_000008_0.jpg",
+    "data\\train\\edible\\Truffles_000008_1.jpg",
+    "data\\train\\edible\\Truffles_000009_0.jpg",
+    "data\\train\\edible\\Truffles_000009_1.jpg",
+    "data\\train\\edible\\Truffles_000010_0.jpg",
+    "data\\train\\edible\\Truffles_000010_1.jpg",
+    "data\\train\\edible\\Truffles_000011_0.jpg",
+    "data\\train\\edible\\Truffles_000012_1.jpg",
+    "data\\train\\edible\\Truffles_000013_0.jpg",
+    "data\\train\\edible\\Truffles_000013_1.jpg",
+    "data\\train\\edible\\Truffles_000014_1.jpg",
+    "data\\train\\edible\\Truffles_000015_0.png",
+    "data\\train\\edible\\Truffles_000015_1.jpg",
+    "data\\train\\edible\\Truffles_000016_0.jpg",
+    "data\\train\\edible\\Truffles_000016_1.jpg",
+    "data\\train\\edible\\Truffles_000017_0.jpg",
+    "data\\train\\edible\\Truffles_000017_1.jpg",
+    "data\\train\\edible\\Truffles_000018_0.jpg",
+    "data\\train\\edible\\Truffles_000018_1.jpg"
+  ],
+  "planned_layout": {
+    "train": {
+      "Agaricus_bisporus": 48,
+      "Agaricus_subrufescens": 48,
+      "Amanita_bisporigera": 48,
+      "Amanita_muscaria": 48,
+      "Amanita_ocreata": 48,
+      "Amanita_phalloides": 48,
+      "Amanita_smithiana": 48,
+      "Amanita_verna": 48,
+      "Amanita_virosa": 48,
+      "Auricularia_auricula": 48,
+      "Boletus_edulis": 48,
+      "Cantharellus_cibarius": 48,
+      "Clitocybe_dealbata": 48,
+      "Conocybe_filaris": 48,
+      "Coprinus_comatus": 48,
+      "Cordyceps_sinensis": 48,
+      "Cortinarius_rubellus": 48,
+      "Entoloma_sinuatum": 48,
+      "Flammulina_velutipes": 48,
+      "Galerina_marginata": 48,
+      "Ganoderma_lucidum": 48,
+      "Grifola_frondosa": 48,
+      "Gyromitra_esculenta": 48,
+      "Hericium_erinaceus": 48,
+      "Hydnum_repandum": 48,
+      "Hypholoma_fasciculare": 48,
+      "Inocybe_erubescens": 48,
+      "Lentinula_edodes": 48,
+      "Lepiota_brunneoincarnata": 48,
+      "Macrolepiota_procera": 48,
+      "Morchella_esculenta": 48,
+      "Omphalotus_olearius": 48,
+      "Paxillus_involutus": 48,
+      "Pholiota_nameko": 48,
+      "Pleurotus_citrinopileatus": 48,
+      "Pleurotus_eryngii": 48,
+      "Pleurotus_ostreatus": 48,
+      "Psilocybe_semilanceata": 48,
+      "Rhodophyllus_rhodopolius": 48,
+      "Russula_emetica": 48,
+      "Russula_virescens": 48,
+      "Scleroderma_citrinum": 48,
+      "Suillus_luteus": 48,
+      "Tremella_fuciformis": 48,
+      "Tricholoma_matsutake": 48,
+      "Tuber_melanosporum": 48
+    },
+    "val": {
+      "Agaricus_bisporus": 6,
+      "Agaricus_subrufescens": 6,
+      "Amanita_bisporigera": 6,
+      "Amanita_muscaria": 6,
+      "Amanita_ocreata": 6,
+      "Amanita_phalloides": 6,
+      "Amanita_smithiana": 6,
+      "Amanita_verna": 6,
+      "Amanita_virosa": 6,
+      "Auricularia_auricula": 6,
+      "Boletus_edulis": 6,
+      "Cantharellus_cibarius": 6,
+      "Clitocybe_dealbata": 6,
+      "Conocybe_filaris": 6,
+      "Coprinus_comatus": 6,
+      "Cordyceps_sinensis": 6,
+      "Cortinarius_rubellus": 6,
+      "Entoloma_sinuatum": 6,
+      "Flammulina_velutipes": 6,
+      "Galerina_marginata": 6,
+      "Ganoderma_lucidum": 6,
+      "Grifola_frondosa": 6,
+      "Gyromitra_esculenta": 6,
+      "Hericium_erinaceus": 6,
+      "Hydnum_repandum": 6,
+      "Hypholoma_fasciculare": 6,
+      "Inocybe_erubescens": 6,
+      "Lentinula_edodes": 6,
+      "Lepiota_brunneoincarnata": 6,
+      "Macrolepiota_procera": 6,
+      "Morchella_esculenta": 6,
+      "Omphalotus_olearius": 6,
+      "Paxillus_involutus": 6,
+      "Pholiota_nameko": 6,
+      "Pleurotus_citrinopileatus": 6,
+      "Pleurotus_eryngii": 6,
+      "Pleurotus_ostreatus": 6,
+      "Psilocybe_semilanceata": 6,
+      "Rhodophyllus_rhodopolius": 6,
+      "Russula_emetica": 6,
+      "Russula_virescens": 6,
+      "Scleroderma_citrinum": 6,
+      "Suillus_luteus": 6,
+      "Tremella_fuciformis": 6,
+      "Tricholoma_matsutake": 6,
+      "Tuber_melanosporum": 6
+    },
+    "test": {
+      "Agaricus_bisporus": 6,
+      "Agaricus_subrufescens": 6,
+      "Amanita_bisporigera": 6,
+      "Amanita_muscaria": 6,
+      "Amanita_ocreata": 6,
+      "Amanita_phalloides": 6,
+      "Amanita_smithiana": 6,
+      "Amanita_verna": 6,
+      "Amanita_virosa": 6,
+      "Auricularia_auricula": 6,
+      "Boletus_edulis": 6,
+      "Cantharellus_cibarius": 6,
+      "Clitocybe_dealbata": 6,
+      "Conocybe_filaris": 6,
+      "Coprinus_comatus": 6,
+      "Cordyceps_sinensis": 6,
+      "Cortinarius_rubellus": 6,
+      "Entoloma_sinuatum": 6,
+      "Flammulina_velutipes": 6,
+      "Galerina_marginata": 6,
+      "Ganoderma_lucidum": 6,
+      "Grifola_frondosa": 6,
+      "Gyromitra_esculenta": 6,
+      "Hericium_erinaceus": 6,
+      "Hydnum_repandum": 6,
+      "Hypholoma_fasciculare": 6,
+      "Inocybe_erubescens": 6,
+      "Lentinula_edodes": 6,
+      "Lepiota_brunneoincarnata": 6,
+      "Macrolepiota_procera": 6,
+      "Morchella_esculenta": 6,
+      "Omphalotus_olearius": 6,
+      "Paxillus_involutus": 6,
+      "Pholiota_nameko": 6,
+      "Pleurotus_citrinopileatus": 6,
+      "Pleurotus_eryngii": 6,
+      "Pleurotus_ostreatus": 6,
+      "Psilocybe_semilanceata": 6,
+      "Rhodophyllus_rhodopolius": 6,
+      "Russula_emetica": 6,
+      "Russula_virescens": 6,
+      "Scleroderma_citrinum": 6,
+      "Suillus_luteus": 6,
+      "Tremella_fuciformis": 6,
+      "Tricholoma_matsutake": 6,
+      "Tuber_melanosporum": 6
+    }
+  },
+  "planned_operations_sample": [
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000001_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000001_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000001_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000001_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000002_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000002_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000002_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000002_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000003_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000003_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000004_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000004_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000005_0.png",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000005_0.png"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000007_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000007_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000007_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000007_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000008_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000008_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000008_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000008_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000009_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000009_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000009_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000009_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000010_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000010_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000010_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000010_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000011_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000011_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000011_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000011_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000012_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000012_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000012_1.png",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000012_1.png"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000013_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000013_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000013_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000013_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000014_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000014_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000015_0.png",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000015_0.png"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000015_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000015_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000016_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000016_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000016_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000016_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000017_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000017_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000017_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000017_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000018_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000018_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000018_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000018_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000019_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000019_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000019_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000019_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000020_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000020_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000020_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000020_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000021_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000021_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000021_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000021_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000022_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000022_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000023_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000023_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000024_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000024_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000025_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000025_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000026_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000026_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000027_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000027_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000027_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000027_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000028_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000028_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000028_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000028_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000029_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000029_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000030_0.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000030_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_bisporus_000030_1.jpg",
+      "target": "data\\species\\train\\Agaricus_bisporus\\Agaricus_bisporus_000030_1.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_subrufescens_000001_0.jpg",
+      "target": "data\\species\\train\\Agaricus_subrufescens\\Agaricus_subrufescens_000001_0.jpg"
+    },
+    {
+      "source": "data\\train\\edible\\Agaricus_subrufescens_000001_1.jpg",
+      "target": "data\\species\\train\\Agaricus_subrufescens\\Agaricus_subrufescens_000001_1.jpg"
+    }
+  ]
+}

@@ -215,7 +215,7 @@ def save_metrics(metrics_path: Path, payload: Dict[str, object]) -> None:
     save_json(metrics_path, payload)
 
 
-def predict_image(image_path: str | Path, model_path: Path = CV_MODEL_PATH) -> Dict[str, object]:
+def predict_image(image_path: str | Path, model_path: Path = CV_MODEL_PATH, top_k: int = 1) -> Dict[str, object]:
     """Run inference on a single mushroom image."""
 
     if not Path(model_path).exists():
@@ -236,15 +236,29 @@ def predict_image(image_path: str | Path, model_path: Path = CV_MODEL_PATH) -> D
     with torch.no_grad():
         outputs = model(tensor)
         probabilities = torch.softmax(outputs, dim=1)[0]
-        confidence, index = torch.max(probabilities, dim=0)
 
-    predicted_label = class_names[int(index.item())]
-    return {
-        "predicted_class": predicted_label,
-        "confidence": float(confidence.item()),
-        "probabilities": probabilities.tolist(),
-        "class_names": class_names,
-    }
+        # top-k support
+        if top_k <= 1:
+            confidence, index = torch.max(probabilities, dim=0)
+            predicted_label = class_names[int(index.item())]
+            return {
+                "predicted_class": predicted_label,
+                "confidence": float(confidence.item()),
+                "probabilities": probabilities.tolist(),
+                "class_names": class_names,
+            }
+        else:
+            topk = torch.topk(probabilities, k=min(top_k, probabilities.size(0)))
+            values = topk.values.tolist()
+            indices = topk.indices.tolist()
+            top_predictions = [
+                {"class": class_names[int(i)], "confidence": float(v)} for i, v in zip(indices, values)
+            ]
+            return {
+                "top_k": top_predictions,
+                "probabilities": probabilities.tolist(),
+                "class_names": class_names,
+            }
 
 
 def train_cv_pipeline(
@@ -258,6 +272,8 @@ def train_cv_pipeline(
     learning_rate: float = 1e-4,
     random_state: int = 42,
     num_workers: int = 0,
+    early_stopping: bool = False,
+    patience: int = 3,
 ) -> Dict[str, object]:
     """Train the CV model and save the best checkpoint."""
 
@@ -265,6 +281,11 @@ def train_cv_pipeline(
     data_dir = resolve_image_root(data_dir)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     LOGGER.info("Using device: %s", device)
+
+    # automatic batch size selection if batch_size is None or 0
+    if not batch_size:
+        # favor larger batches on GPU, modest on CPU
+        batch_size = 64 if torch.cuda.is_available() else 16
 
     train_loader, val_loader, test_loader, class_names, class_to_idx = build_dataloaders(
         data_dir=data_dir,
@@ -283,6 +304,7 @@ def train_cv_pipeline(
     best_val_loss = float("inf")
     best_state_dict = None
     history: List[Dict[str, float]] = []
+    epochs_without_improvement = 0
 
     for epoch in range(1, epochs + 1):
         train_loss, train_accuracy = train_one_epoch(model, train_loader, criterion, optimizer, device)
@@ -306,10 +328,19 @@ def train_cv_pipeline(
             val_accuracy,
         )
 
+        # track best
         if val_accuracy >= best_val_accuracy:
             best_val_accuracy = val_accuracy
             best_val_loss = val_loss
             best_state_dict = {key: value.cpu() for key, value in model.state_dict().items()}
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+
+        # early stopping
+        if early_stopping and epochs_without_improvement >= patience:
+            LOGGER.info("Early stopping triggered (no improvement for %s epochs)", patience)
+            break
 
     if best_state_dict is not None:
         model.load_state_dict(best_state_dict)

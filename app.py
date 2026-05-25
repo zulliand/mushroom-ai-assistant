@@ -14,7 +14,14 @@ import pandas as pd
 
 from llm import compare_prompt_strategies, generate_mushroom_advice
 from train_cv import predict_image
-from utils import CV_MODEL_PATH, NUMERIC_METRICS_PATH, NUMERIC_PIPELINE_PATH, setup_logging
+from species_info import get_species_info
+from utils import (
+    CV_MODEL_PATH,
+    NUMERIC_METRICS_PATH,
+    NUMERIC_PIPELINE_PATH,
+    setup_logging,
+    SPECIES_CV_MODEL_PATH,
+)
 
 LOGGER = logging.getLogger("mushroom.app")
 
@@ -132,7 +139,15 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
     if not image_path:
         raise ValueError("Please upload a mushroom image before running the assistant.")
 
-    cv_result = predict_image(image_path, CV_MODEL_PATH)
+    # Prefer species-level model if available, otherwise fall back to binary CV model
+    if SPECIES_CV_MODEL_PATH.exists():
+        model_path = SPECIES_CV_MODEL_PATH
+        # request top-3 predictions for species model
+        cv_result = predict_image(image_path, model_path, top_k=3)
+    else:
+        model_path = CV_MODEL_PATH
+        cv_result = predict_image(image_path, model_path, top_k=1)
+
     numeric_result = predict_numeric_sample(feature_json)
     advice = generate_mushroom_advice(cv_result, numeric_result, api_key=api_key, model=openai_model, prompt_variant="B")
     prompt_comparison = compare_prompt_strategies(cv_result, numeric_result, api_key=api_key, model=openai_model)
@@ -140,23 +155,63 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
     signals = prompt_comparison["signals"]
     high_trust = signals["allow_cooking"]
 
-    summary = (
-        f"## Mushroom AI Assistant Results\n\n"
-        f"**CV prediction:** {cv_result['predicted_class']} ({cv_result['confidence']:.2%})\n\n"
-        f"**Numeric prediction:** {numeric_result['predicted_label']}"
-    )
+    # Build a friendly summary using species metadata when available
+    summary_lines = ["## Mushroom AI Assistant Results\n"]
+
+    # Extract prediction info (support top-k and single outputs)
+    top_k_list = []
+    main_pred = None
+    main_conf = None
+    if isinstance(cv_result, dict) and "top_k" in cv_result:
+        top_k_list = cv_result["top_k"]
+        if top_k_list:
+            main_pred = top_k_list[0]["class"]
+            main_conf = float(top_k_list[0].get("confidence", 0.0))
+    else:
+        main_pred = cv_result.get("predicted_class")
+        main_conf = float(cv_result.get("confidence")) if cv_result.get("confidence") is not None else None
+
+    if main_pred:
+        summary_lines.append(f"**CV prediction:** {main_pred} ({(main_conf or 0):.2%})\n")
+    else:
+        summary_lines.append("**CV prediction:** (no prediction)\n")
+
+    # Top-3 display
+    if top_k_list:
+        top3_text = ", ".join([f"{p['class']} ({p['confidence']:.2%})" for p in top_k_list[:3]])
+        summary_lines.append(f"**Top-3 species:** {top3_text}\n")
+
+    # Species metadata (common name, edibility, cookable)
+    species_meta = get_species_info(main_pred) if main_pred else None
+    if species_meta:
+        summary_lines.append(f"**Common name:** {species_meta.get('common_name')}\n")
+        summary_lines.append(f"**Edibility:** {species_meta.get('edibility')}\n")
+        summary_lines.append(f"**Cookable:** {species_meta.get('cookable')}\n")
+
+    summary_lines.append(f"**Numeric prediction:** {numeric_result['predicted_label']}")
     if numeric_result.get("edible_probability") is not None:
-        summary += f" ({numeric_result['edible_probability']:.2%} edible probability)"
+        summary_lines[-1] += f" ({numeric_result['edible_probability']:.2%} edible probability)"
+
+    summary = "\n".join(summary_lines)
+
     summary += (
         f"\n\n**Decision logic:** {'High-trust path enabled' if high_trust else 'High-trust path blocked'}"
         f"\n\n**Prompt strategy chosen:** {advice.get('prompt_variant', 'B')}"
     )
+
     summary += (
-        f"\n\n**LLM explanation:** {advice['explanation']}\n\n"
-        f"**Safety warning:** {advice['safety_warning']}\n\n"
-        f"**Cooking suggestions:** {advice['cooking_suggestions']}\n\n"
-        f"**Disclaimer:** {advice['disclaimer']}"
+        f"\n\n**LLM explanation:** {advice.get('explanation')}\n\n"
+        f"**Safety warning:** {advice.get('safety_warning')}\n\n"
     )
+
+    # Only include cooking suggestions if safety logic allows and confidence threshold passed
+    CONFIDENCE_THRESHOLD = 0.75
+    if high_trust and main_conf is not None and main_conf >= CONFIDENCE_THRESHOLD:
+        summary += f"**Cooking suggestions:** {advice.get('cooking_suggestions')}\n\n"
+    else:
+        summary += "**Cooking suggestions:** (not shown due to low confidence or safety)\n\n"
+
+    summary += f"**Disclaimer:** {advice.get('disclaimer')}"
 
     return summary, cv_result, numeric_result, advice, prompt_comparison
 

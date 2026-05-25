@@ -22,6 +22,11 @@ NUMERIC_PIPELINE_PATH = MODELS_DIR / "mushroom_numeric_pipeline.pkl"
 NUMERIC_METADATA_PATH = MODELS_DIR / "mushroom_numeric_metadata.json"
 NUMERIC_METRICS_PATH = MODELS_DIR / "numeric_metrics.json"
 CV_METRICS_PATH = MODELS_DIR / "cv_metrics.json"
+# Species-specific artifacts
+SPECIES_IMAGES_DIR = DATA_DIR / "species_images"
+SPECIES_CV_MODEL_PATH = MODELS_DIR / "mushroom_species_cv.pt"
+SPECIES_CV_METADATA_PATH = MODELS_DIR / "mushroom_species_cv_metadata.json"
+SPECIES_CV_METRICS_PATH = MODELS_DIR / "species_cv_metrics.json"
 
 
 def setup_logging(level: int = logging.INFO) -> None:

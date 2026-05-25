@@ -1,7 +1,15 @@
 __pycache__/
 *.pyc
 .venv/
+
 data/images/
 data/train/
 data/val/
 data/test/
+
+data/raw/
+data/species_images/
+models/mushroom_species_cv.pt
+*.pt
+*.pth
+*.ckpt

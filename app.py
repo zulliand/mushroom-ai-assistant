@@ -1,0 +1,212 @@
+"""Gradio application for the integrated Mushroom AI Assistant."""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any, Dict, Tuple
+
+import gradio as gr
+import joblib
+import pandas as pd
+
+from llm import compare_prompt_strategies, generate_mushroom_advice
+from train_cv import predict_image
+from utils import CV_MODEL_PATH, NUMERIC_METRICS_PATH, NUMERIC_PIPELINE_PATH, setup_logging
+
+LOGGER = logging.getLogger("mushroom.app")
+
+DEFAULT_FEATURE_TEMPLATE = {
+    "cap_shape": "x",
+    "cap_surface": "s",
+    "cap_color": "n",
+    "bruises": "t",
+    "odor": "n",
+    "gill_attachment": "f",
+    "gill_spacing": "c",
+    "gill_size": "b",
+    "gill_color": "k",
+    "stalkshape": "e",
+    "stalk_root": "b",
+    "stalk_surface_above_ring": "s",
+    "stalk_surface_below_ring": "s",
+    "stalk_color_above_ring": "w",
+    "stalk_color_below_ring": "w",
+    "veil_type": "p",
+    "veil_color": "w",
+    "ring_number": "o",
+    "ring_type": "p",
+    "spore_print_color": "k",
+    "population": "s",
+    "habitat": "u",
+}
+
+NUMERIC_FEATURE_ORDER = list(DEFAULT_FEATURE_TEMPLATE.keys())
+NUMERIC_CLASS_LABELS = {0: "edible", 1: "poisonous"}
+FEATURE_ALIASES = {"stalk_shape": "stalkshape"}
+
+
+def get_openai_api_key(fallback: str = "") -> str:
+    """Read the OpenAI key from the environment or an optional UI override."""
+
+    return os.getenv("OPENAI_API_KEY", fallback).strip()
+
+
+def parse_feature_payload(feature_text: str) -> Dict[str, object]:
+    """Parse a JSON payload describing mushroom features."""
+
+    if not feature_text.strip():
+        return {}
+    payload = json.loads(feature_text)
+    if not isinstance(payload, dict):
+        raise ValueError("Structured mushroom features must be a JSON object.")
+    return payload
+
+
+def normalize_feature_names(features: Dict[str, object]) -> Dict[str, object]:
+    """Normalize a few common schema aliases to the trained model's feature names."""
+
+    normalized = dict(features)
+    for source_name, target_name in FEATURE_ALIASES.items():
+        if source_name in normalized and target_name not in normalized:
+            normalized[target_name] = normalized.pop(source_name)
+    return normalized
+
+
+def load_numeric_pipeline() -> Any:
+    """Load the trained numeric pipeline artifact."""
+
+    if not NUMERIC_PIPELINE_PATH.exists():
+        raise FileNotFoundError(f"Numeric pipeline not found at {NUMERIC_PIPELINE_PATH}. Train the numeric model first.")
+    return joblib.load(NUMERIC_PIPELINE_PATH)
+
+
+def load_numeric_metadata() -> Dict[str, Any]:
+    """Load numeric metrics metadata if it exists."""
+
+    if not NUMERIC_METRICS_PATH.exists():
+        return {}
+    return json.loads(NUMERIC_METRICS_PATH.read_text(encoding="utf-8"))
+
+
+def build_numeric_frame(feature_json: str) -> pd.DataFrame:
+    """Normalize the JSON payload into a single-row dataframe with all required columns."""
+
+    features = normalize_feature_names(parse_feature_payload(feature_json))
+    row = {column: features.get(column, DEFAULT_FEATURE_TEMPLATE[column]) for column in NUMERIC_FEATURE_ORDER}
+    return pd.DataFrame([row], columns=NUMERIC_FEATURE_ORDER)
+
+
+def predict_numeric_sample(feature_json: str) -> Dict[str, object]:
+    """Run inference through the saved numeric pipeline."""
+
+    pipeline = load_numeric_pipeline()
+    metadata = load_numeric_metadata()
+    frame = build_numeric_frame(feature_json)
+    prediction = int(pipeline.predict(frame)[0])
+    probabilities = pipeline.predict_proba(frame)[0] if hasattr(pipeline, "predict_proba") else None
+
+    edible_probability = None
+    if probabilities is not None:
+        class_labels = metadata.get("label_classes") or ["e", "p"]
+        edible_index = 0 if class_labels and str(class_labels[0]).lower() in {"e", "edible"} else None
+        if edible_index is None and len(probabilities) > 1:
+            edible_index = 1
+        if edible_index is not None:
+            edible_probability = float(probabilities[edible_index])
+
+    predicted_label = NUMERIC_CLASS_LABELS.get(prediction, str(prediction))
+    return {
+        "predicted_label": predicted_label,
+        "edible_probability": edible_probability,
+        "probabilities": None if probabilities is None else probabilities.tolist(),
+        "features": frame.iloc[0].to_dict(),
+    }
+
+
+def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model: str) -> Tuple[str, Dict[str, object], Dict[str, object], Dict[str, object], Dict[str, object]]:
+    """Run the three-stage assistant and return user-facing outputs."""
+
+    if not image_path:
+        raise ValueError("Please upload a mushroom image before running the assistant.")
+
+    cv_result = predict_image(image_path, CV_MODEL_PATH)
+    numeric_result = predict_numeric_sample(feature_json)
+    advice = generate_mushroom_advice(cv_result, numeric_result, api_key=api_key, model=openai_model, prompt_variant="B")
+    prompt_comparison = compare_prompt_strategies(cv_result, numeric_result, api_key=api_key, model=openai_model)
+
+    signals = prompt_comparison["signals"]
+    high_trust = signals["allow_cooking"]
+
+    summary = (
+        f"## Mushroom AI Assistant Results\n\n"
+        f"**CV prediction:** {cv_result['predicted_class']} ({cv_result['confidence']:.2%})\n\n"
+        f"**Numeric prediction:** {numeric_result['predicted_label']}"
+    )
+    if numeric_result.get("edible_probability") is not None:
+        summary += f" ({numeric_result['edible_probability']:.2%} edible probability)"
+    summary += (
+        f"\n\n**Decision logic:** {'High-trust path enabled' if high_trust else 'High-trust path blocked'}"
+        f"\n\n**Prompt strategy chosen:** {advice.get('prompt_variant', 'B')}"
+    )
+    summary += (
+        f"\n\n**LLM explanation:** {advice['explanation']}\n\n"
+        f"**Safety warning:** {advice['safety_warning']}\n\n"
+        f"**Cooking suggestions:** {advice['cooking_suggestions']}\n\n"
+        f"**Disclaimer:** {advice['disclaimer']}"
+    )
+
+    return summary, cv_result, numeric_result, advice, prompt_comparison
+
+
+def build_interface() -> gr.Blocks:
+    """Create the Gradio UI."""
+
+    setup_logging()
+    with gr.Blocks(theme=gr.themes.Soft(), title="Mushroom AI Assistant") as demo:
+        gr.Markdown(
+            "# Mushroom AI Assistant\n"
+            "Upload a mushroom image, provide structured mushroom features as JSON, and get an integrated safety assessment with prompt comparison."
+        )
+        with gr.Row():
+            with gr.Column(scale=1):
+                image_input = gr.Image(type="filepath", label="Mushroom image")
+                feature_input = gr.Textbox(
+                    label="Structured mushroom features as JSON",
+                    lines=16,
+                    value=json.dumps(DEFAULT_FEATURE_TEMPLATE, indent=2),
+                    placeholder='{"cap_shape": "x", "odor": "n", "habitat": "u"}',
+                )
+                api_key_input = gr.Textbox(label="OpenAI API key override", type="password", value="")
+                model_input = gr.Textbox(label="OpenAI model", value="gpt-4o-mini")
+                run_button = gr.Button("Analyze mushroom", variant="primary")
+            with gr.Column(scale=1):
+                summary_output = gr.Markdown(label="Integrated assessment")
+                cv_output = gr.JSON(label="Computer vision output")
+                numeric_output = gr.JSON(label="Numeric model output")
+                llm_output = gr.JSON(label="LLM output")
+                comparison_output = gr.JSON(label="Prompt comparison")
+
+        def submit(image_path: str, feature_json: str, api_key_override: str, openai_model: str):
+            combined_key = get_openai_api_key(api_key_override)
+            return run_assistant(image_path, feature_json, combined_key, openai_model)
+
+        run_button.click(
+            fn=submit,
+            inputs=[image_input, feature_input, api_key_input, model_input],
+            outputs=[summary_output, cv_output, numeric_output, llm_output, comparison_output],
+        )
+    return demo
+
+
+def main() -> None:
+    """Launch the Gradio app."""
+
+    demo = build_interface()
+    demo.launch(server_name="0.0.0.0", server_port=int(os.getenv("PORT", "7860")))
+
+
+if __name__ == "__main__":
+    main()

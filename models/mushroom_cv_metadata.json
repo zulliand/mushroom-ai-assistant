@@ -1,0 +1,37 @@
+{
+  "architecture": "resnet18",
+  "best_val_accuracy": 0.8014184397163121,
+  "class_names": [
+    "edible",
+    "poisonous"
+  ],
+  "class_to_idx": {
+    "edible": 0,
+    "poisonous": 1
+  },
+  "history": [
+    {
+      "epoch": 1.0,
+      "train_accuracy": 0.5953014184397163,
+      "train_loss": 0.6650008229499168,
+      "val_accuracy": 0.7340425531914894,
+      "val_loss": 0.5809201441758068
+    },
+    {
+      "epoch": 2.0,
+      "train_accuracy": 0.6777482269503546,
+      "train_loss": 0.5980652583406326,
+      "val_accuracy": 0.8014184397163121,
+      "val_loss": 0.5225227779530465
+    },
+    {
+      "epoch": 3.0,
+      "train_accuracy": 0.7043439716312057,
+      "train_loss": 0.5731008437508387,
+      "val_accuracy": 0.7695035460992907,
+      "val_loss": 0.4925381063569522
+    }
+  ],
+  "image_size": 160,
+  "test_accuracy": 0.7907801418439716
+}

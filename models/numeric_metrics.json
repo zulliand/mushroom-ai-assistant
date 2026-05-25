@@ -1,0 +1,46 @@
+{
+  "dataset_path": "C:\\Users\\andre\\Documents\\Schule\\SEM6\\KI-Anwendungen\\mushroom-ai-assistant\\data\\Mushroom data.csv",
+  "target_column": "Mushroom_quality",
+  "rows": 8124,
+  "feature_count": 22,
+  "target_distribution": {
+    "e": 4208,
+    "p": 3916
+  },
+  "model_comparison": [
+    {
+      "model": "RandomForest",
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    {
+      "model": "LogisticRegression",
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    }
+  ],
+  "selected_model": "RandomForest",
+  "validation_metrics": {
+    "model": "RandomForest",
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "test_metrics": {
+    "model": "RandomForest",
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "label_classes": [
+    "e",
+    "p"
+  ],
+  "pipeline_path": "C:\\Users\\andre\\Documents\\Schule\\SEM6\\KI-Anwendungen\\mushroom-ai-assistant\\models\\mushroom_numeric_pipeline.pkl"
+}

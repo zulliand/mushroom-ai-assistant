@@ -11,8 +11,8 @@ from openai import OpenAI
 
 LOGGER = logging.getLogger("mushroom.llm")
 DEFAULT_MODEL = "gpt-4o-mini"
-HIGH_CONFIDENCE_THRESHOLD = 0.85
-PROMPT_B_COOKING_THRESHOLD = 0.9
+HIGH_CONFIDENCE_THRESHOLD = 0.80
+PROMPT_B_COOKING_THRESHOLD = 0.80
 
 
 @dataclass

@@ -5,13 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import random
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 import torch
 import torch.nn as nn
 from PIL import Image
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, models, transforms
 
 from utils import CV_MODEL_PATH, DATA_DIR, IMAGES_DIR, MODELS_DIR, ensure_directory, save_json, setup_logging
@@ -19,6 +20,7 @@ from utils import CV_MODEL_PATH, DATA_DIR, IMAGES_DIR, MODELS_DIR, ensure_direct
 LOGGER = logging.getLogger("mushroom.cv")
 METRICS_PATH = MODELS_DIR / "cv_metrics.json"
 DEFAULT_DATA_DIR = DATA_DIR
+SUPPORTED_MODEL_NAMES = {"resnet18", "efficientnet_b0"}
 
 
 def resolve_image_root(data_dir: Path) -> Path:
@@ -93,6 +95,10 @@ def build_dataloaders(
     image_size: int,
     batch_size: int,
     num_workers: int,
+    max_train_samples: int | None = None,
+    max_val_samples: int | None = None,
+    max_test_samples: int | None = None,
+    random_state: int = 42,
 ):
     """Create train, validation, and test data loaders."""
 
@@ -101,37 +107,95 @@ def build_dataloaders(
         image_size=image_size,
     )
 
+    def _limit(dataset, max_samples: int | None):
+        if not max_samples or max_samples <= 0 or max_samples >= len(dataset):
+            return dataset, len(dataset)
+        indices = list(range(len(dataset)))
+        rng = random.Random(random_state)
+        rng.shuffle(indices)
+        selected = indices[:max_samples]
+        return Subset(dataset, selected), len(selected)
+
+    train_dataset, train_count = _limit(train_dataset, max_train_samples)
+    val_dataset, val_count = _limit(val_dataset, max_val_samples)
+    test_dataset, test_count = _limit(test_dataset, max_test_samples)
+
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
-    return train_loader, val_loader, test_loader, class_names, class_to_idx
+    return train_loader, val_loader, test_loader, class_names, class_to_idx, {
+        "train": train_count,
+        "val": val_count,
+        "test": test_count,
+    }
 
 
-def build_model(num_classes: int) -> Tuple[nn.Module, bool]:
-    """Create a ResNet18 transfer-learning model."""
+def build_model(num_classes: int, model_name: str = "resnet18") -> Tuple[nn.Module, bool]:
+    """Create a transfer-learning model for the requested backbone."""
+
+    if model_name not in SUPPORTED_MODEL_NAMES:
+        raise ValueError(f"Unsupported model_name '{model_name}'. Supported: {sorted(SUPPORTED_MODEL_NAMES)}")
 
     freeze_backbone = True
+    model = None
+
     try:
-        weights = models.ResNet18_Weights.DEFAULT
-        model = models.resnet18(weights=weights)
+        if model_name == "resnet18":
+            weights = models.ResNet18_Weights.DEFAULT
+            model = models.resnet18(weights=weights)
+        elif model_name == "efficientnet_b0":
+            weights = models.EfficientNet_B0_Weights.DEFAULT
+            model = models.efficientnet_b0(weights=weights)
     except Exception as exc:  # pragma: no cover - fallback path for offline environments
-        LOGGER.warning("Pretrained weights unavailable, falling back to randomly initialized ResNet18: %s", exc)
-        model = models.resnet18(weights=None)
+        LOGGER.warning("Pretrained weights unavailable for %s, falling back to random init: %s", model_name, exc)
+        if model_name == "resnet18":
+            model = models.resnet18(weights=None)
+        else:
+            model = models.efficientnet_b0(weights=None)
         freeze_backbone = False
 
-    if freeze_backbone:
-        for name, parameter in model.named_parameters():
-            if not name.startswith("fc"):
-                parameter.requires_grad = False
+    if model is None:
+        raise RuntimeError(f"Could not create model for backbone: {model_name}")
 
-    in_features = model.fc.in_features
-    model.fc = nn.Sequential(
-        nn.Linear(in_features, 256),
-        nn.ReLU(inplace=True),
-        nn.Dropout(0.3),
-        nn.Linear(256, num_classes),
-    )
+    if freeze_backbone:
+        if model_name == "resnet18":
+            for name, parameter in model.named_parameters():
+                if not name.startswith("fc"):
+                    parameter.requires_grad = False
+        else:
+            for name, parameter in model.named_parameters():
+                if not name.startswith("classifier"):
+                    parameter.requires_grad = False
+
+    if model_name == "resnet18":
+        in_features = model.fc.in_features
+        model.fc = nn.Sequential(
+            nn.Linear(in_features, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes),
+        )
+    else:
+        in_features = model.classifier[1].in_features
+        model.classifier = nn.Sequential(
+            nn.Dropout(p=0.2, inplace=True),
+            nn.Linear(in_features, num_classes),
+        )
+
     return model, freeze_backbone
+
+
+def _topk_accuracy(outputs: torch.Tensor, labels: torch.Tensor, top_k: int) -> float:
+    """Compute top-k accuracy for a batch."""
+
+    if outputs.size(1) == 0:
+        return 0.0
+    k = min(top_k, outputs.size(1))
+    if k <= 0:
+        return 0.0
+    topk_indices = torch.topk(outputs, k=k, dim=1).indices
+    correct = topk_indices.eq(labels.unsqueeze(1)).any(dim=1)
+    return float(correct.float().mean().item())
 
 
 def train_one_epoch(model, dataloader, criterion, optimizer, device):
@@ -161,11 +225,13 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
 
 
 def evaluate(model, dataloader, criterion, device):
-    """Evaluate the model on the validation split."""
+    """Evaluate the model on a split and compute top-1/3/5 accuracy."""
 
     model.eval()
     running_loss = 0.0
-    correct = 0
+    top1_correct = 0
+    top3_correct = 0
+    top5_correct = 0
     total = 0
 
     with torch.no_grad():
@@ -177,10 +243,29 @@ def evaluate(model, dataloader, criterion, device):
 
             running_loss += float(loss.item()) * images.size(0)
             predictions = outputs.argmax(dim=1)
-            correct += int((predictions == labels).sum().item())
+            top1_correct += int((predictions == labels).sum().item())
+            top3_correct += int(
+                torch.topk(outputs, k=min(3, outputs.size(1)), dim=1)
+                .indices.eq(labels.unsqueeze(1))
+                .any(dim=1)
+                .sum()
+                .item()
+            )
+            top5_correct += int(
+                torch.topk(outputs, k=min(5, outputs.size(1)), dim=1)
+                .indices.eq(labels.unsqueeze(1))
+                .any(dim=1)
+                .sum()
+                .item()
+            )
             total += int(labels.size(0))
 
-    return running_loss / max(1, total), correct / max(1, total)
+    return (
+        running_loss / max(1, total),
+        top1_correct / max(1, total),
+        top3_correct / max(1, total),
+        top5_correct / max(1, total),
+    )
 
 
 def save_checkpoint(
@@ -190,6 +275,7 @@ def save_checkpoint(
     class_to_idx: Dict[str, int],
     image_size: int,
     freeze_backbone: bool,
+    model_name: str,
     metrics: Dict[str, float],
 ) -> None:
     """Persist the trained CV model and its metadata."""
@@ -197,7 +283,7 @@ def save_checkpoint(
     ensure_directory(checkpoint_path.parent)
     torch.save(
         {
-            "architecture": "resnet18",
+            "architecture": model_name,
             "state_dict": model.state_dict(),
             "class_names": class_names,
             "class_to_idx": class_to_idx,
@@ -224,8 +310,9 @@ def predict_image(image_path: str | Path, model_path: Path = CV_MODEL_PATH, top_
     checkpoint = torch.load(model_path, map_location="cpu")
     image_size = int(checkpoint.get("image_size", 224))
     class_names = list(checkpoint["class_names"])
+    model_name = str(checkpoint.get("architecture", "resnet18"))
 
-    model, _ = build_model(num_classes=len(class_names))
+    model, _ = build_model(num_classes=len(class_names), model_name=model_name)
     model.load_state_dict(checkpoint["state_dict"])
     model.eval()
 
@@ -274,6 +361,10 @@ def train_cv_pipeline(
     num_workers: int = 0,
     early_stopping: bool = False,
     patience: int = 3,
+    max_train_samples: int | None = None,
+    max_val_samples: int | None = None,
+    max_test_samples: int | None = None,
+    model_name: str = "resnet18",
 ) -> Dict[str, object]:
     """Train the CV model and save the best checkpoint."""
 
@@ -281,20 +372,33 @@ def train_cv_pipeline(
     data_dir = resolve_image_root(data_dir)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     LOGGER.info("Using device: %s", device)
+    LOGGER.info("Using backbone: %s", model_name)
 
     # automatic batch size selection if batch_size is None or 0
     if not batch_size:
         # favor larger batches on GPU, modest on CPU
         batch_size = 64 if torch.cuda.is_available() else 16
 
-    train_loader, val_loader, test_loader, class_names, class_to_idx = build_dataloaders(
+    train_loader, val_loader, test_loader, class_names, class_to_idx, effective_sizes = build_dataloaders(
         data_dir=data_dir,
         image_size=image_size,
         batch_size=batch_size,
         num_workers=num_workers,
+        max_train_samples=max_train_samples,
+        max_val_samples=max_val_samples,
+        max_test_samples=max_test_samples,
+        random_state=random_state,
     )
 
-    model, freeze_backbone = build_model(num_classes=len(class_names))
+    LOGGER.info(
+        "Effective dataset sizes - train: %s, val: %s, test: %s",
+        effective_sizes["train"],
+        effective_sizes["val"],
+        effective_sizes["test"],
+    )
+
+
+    model, freeze_backbone = build_model(num_classes=len(class_names), model_name=model_name)
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
@@ -308,29 +412,33 @@ def train_cv_pipeline(
 
     for epoch in range(1, epochs + 1):
         train_loss, train_accuracy = train_one_epoch(model, train_loader, criterion, optimizer, device)
-        val_loss, val_accuracy = evaluate(model, val_loader, criterion, device)
+        val_loss, val_top1, val_top3, val_top5 = evaluate(model, val_loader, criterion, device)
         history.append(
             {
                 "epoch": float(epoch),
                 "train_loss": float(train_loss),
                 "train_accuracy": float(train_accuracy),
                 "val_loss": float(val_loss),
-                "val_accuracy": float(val_accuracy),
+                "val_top1_accuracy": float(val_top1),
+                "val_top3_accuracy": float(val_top3),
+                "val_top5_accuracy": float(val_top5),
             }
         )
         LOGGER.info(
-            "Epoch %s/%s - train loss %.4f - train acc %.4f - val loss %.4f - val acc %.4f",
+            "Epoch %s/%s - train loss %.4f - train acc %.4f - val loss %.4f - top1 %.4f - top3 %.4f - top5 %.4f",
             epoch,
             epochs,
             train_loss,
             train_accuracy,
             val_loss,
-            val_accuracy,
+            val_top1,
+            val_top3,
+            val_top5,
         )
 
         # track best
-        if val_accuracy >= best_val_accuracy:
-            best_val_accuracy = val_accuracy
+        if val_top1 >= best_val_accuracy:
+            best_val_accuracy = val_top1
             best_val_loss = val_loss
             best_state_dict = {key: value.cpu() for key, value in model.state_dict().items()}
             epochs_without_improvement = 0
@@ -345,23 +453,29 @@ def train_cv_pipeline(
     if best_state_dict is not None:
         model.load_state_dict(best_state_dict)
 
-    test_loss, test_accuracy = evaluate(model, test_loader, criterion, device)
+    test_loss, test_top1, test_top3, test_top5 = evaluate(model, test_loader, criterion, device)
     metrics = {
+        "model_name": model_name,
         "best_val_accuracy": float(best_val_accuracy),
         "best_val_loss": float(best_val_loss),
-        "test_accuracy": float(test_accuracy),
+        "top1_accuracy": float(test_top1),
+        "top3_accuracy": float(test_top3),
+        "top5_accuracy": float(test_top5),
+        "test_accuracy": float(test_top1),
         "test_loss": float(test_loss),
         "history": history,
+        "effective_dataset_sizes": effective_sizes,
     }
-    save_checkpoint(model, checkpoint_path, class_names, class_to_idx, image_size, freeze_backbone, metrics)
+    save_checkpoint(model, checkpoint_path, class_names, class_to_idx, image_size, freeze_backbone, model_name, metrics)
 
     metadata = {
         "architecture": "resnet18",
         "class_names": class_names,
         "class_to_idx": class_to_idx,
         "image_size": image_size,
+        "model_name": model_name,
         "best_val_accuracy": best_val_accuracy,
-        "test_accuracy": test_accuracy,
+        "test_accuracy": test_top1,
         "history": history,
     }
     if metadata_path is None:
@@ -372,15 +486,21 @@ def train_cv_pipeline(
         "class_names": class_names,
         "best_val_accuracy": float(best_val_accuracy),
         "best_val_loss": float(best_val_loss),
-        "test_accuracy": float(test_accuracy),
+        "top1_accuracy": float(test_top1),
+        "top3_accuracy": float(test_top3),
+        "top5_accuracy": float(test_top5),
+        "test_accuracy": float(test_top1),
         "test_loss": float(test_loss),
         "history": history,
         "checkpoint_path": str(checkpoint_path),
         "metadata_path": str(metadata_path),
+        "model_name": model_name,
     })
 
     LOGGER.info("Validation accuracy: %.4f", best_val_accuracy)
-    LOGGER.info("Test accuracy: %.4f", test_accuracy)
+    LOGGER.info("Test top-1 accuracy: %.4f", test_top1)
+    LOGGER.info("Test top-3 accuracy: %.4f", test_top3)
+    LOGGER.info("Test top-5 accuracy: %.4f", test_top5)
     LOGGER.info("Saved CV checkpoint to %s", checkpoint_path)
     LOGGER.info("Saved CV metrics to %s", metrics_path)
     return {
@@ -388,8 +508,12 @@ def train_cv_pipeline(
         "metadata_path": str(metadata_path),
         "metrics_path": str(metrics_path),
         "best_val_accuracy": float(best_val_accuracy),
-        "test_accuracy": float(test_accuracy),
+        "top1_accuracy": float(test_top1),
+        "top3_accuracy": float(test_top3),
+        "top5_accuracy": float(test_top5),
+        "test_accuracy": float(test_top1),
         "class_names": class_names,
+        "model_name": model_name,
     }
 
 

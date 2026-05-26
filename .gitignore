@@ -1,15 +1,22 @@
+.env
 __pycache__/
 *.pyc
 .venv/
 
+# Data folders (do not commit large raw datasets or derived image folders)
+data/raw/
+data/species_images/
+
+# Common dataset folders (if used locally)
 data/images/
 data/train/
 data/val/
 data/test/
 
-data/raw/
-data/species_images/
-models/mushroom_species_cv.pt
+# Model checkpoints
 *.pt
 *.pth
 *.ckpt
+
+# Optional specific checkpoint file (do not commit large binaries)
+models/mushroom_species_cv.pt

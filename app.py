@@ -194,10 +194,37 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
 
     summary = "\n".join(summary_lines)
 
-    summary += (
-        f"\n\n**Decision logic:** {'High-trust path enabled' if high_trust else 'High-trust path blocked'}"
-        f"\n\n**Prompt strategy chosen:** {advice.get('prompt_variant', 'B')}"
-    )
+    # Determine whether CV expresses an edibility claim (from species metadata or binary CV)
+    cv_claim = None
+    if species_meta and species_meta.get("edibility"):
+        cv_claim = str(species_meta.get("edibility")).lower()
+    else:
+        cv_label = cv_result.get("predicted_class") if isinstance(cv_result, dict) else None
+        if cv_label:
+            cv_label_lower = str(cv_label).lower()
+            if cv_label_lower in {"poisonous", "poison", "toxic"}:
+                cv_claim = "poisonous"
+            elif cv_label_lower in {"edible", "e"}:
+                cv_claim = "edible"
+
+    numeric_claim = str(numeric_result.get("predicted_label")).lower() if numeric_result.get("predicted_label") is not None else None
+
+    # If CV and numeric disagree (CV says poisonous and numeric says edible), show a clear conflict block
+    conflict = cv_claim is not None and numeric_claim is not None and cv_claim != numeric_claim
+    if conflict and cv_claim == "poisonous" and numeric_claim == "edible":
+        summary += (
+            "\n\n**Conflict detected:**\n"
+            "Computer vision predicts poisonous species.\n"
+            f"CV prediction: {main_pred} — {(main_conf or 0):.1%}\n"
+            "Structured feature model predicts edible.\n"
+            f"Structured-model estimate: {numeric_result.get('edible_probability'):.1%} edible (from CSV model, not the image)\n\n"
+            "**Result withheld due to disagreement.**\n"
+        )
+    else:
+        summary += (
+            f"\n\n**Decision logic:** {'High-trust path enabled' if high_trust else 'High-trust path blocked'}"
+            f"\n\n**Prompt strategy chosen:** {advice.get('prompt_variant', 'B')}"
+        )
 
     summary += (
         f"\n\n**LLM explanation:** {advice.get('explanation')}\n\n"

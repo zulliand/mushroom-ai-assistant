@@ -23,6 +23,9 @@ class MushroomSignals:
     cv_confidence: float
     numeric_class: str
     numeric_edible_probability: Optional[float]
+    common_name: Optional[str] = None
+    cv_edibility: Optional[str] = None
+    conflict_detected: bool = False
 
 
 def should_allow_cooking(signals: MushroomSignals) -> bool:
@@ -43,10 +46,13 @@ def build_context(signals: MushroomSignals) -> Dict[str, Any]:
     allow_cooking = should_allow_cooking(signals)
     return {
         "species": signals.species,
+        "common_name": signals.common_name,
         "cv_confidence": round(signals.cv_confidence, 4),
+        "cv_edibility": signals.cv_edibility,
         "numeric_prediction": signals.numeric_class,
         "numeric_probability": None if signals.numeric_edible_probability is None else round(signals.numeric_edible_probability, 4),
         "allow_cooking": allow_cooking,
+        "conflict_detected": signals.conflict_detected,
         "required_disclaimer": "This application is for educational purposes only and must not be used as the sole basis for eating wild mushrooms.",
     }
 
@@ -109,10 +115,18 @@ def heuristic_prompt_score(response: Dict[str, str], allow_cooking: bool) -> Dic
 def fallback_response(signals: MushroomSignals, prompt_variant: str, allow_cooking: bool) -> Dict[str, str]:
     """Return a deterministic safety-focused response when the API is unavailable."""
 
+    species_text = signals.species
+    if signals.common_name:
+        species_text = f"{signals.species} ({signals.common_name})"
+
     explanation = (
-        f"Computer vision suggests {signals.species} with confidence {signals.cv_confidence:.2f}. "
+        f"Computer vision suggests {species_text} with confidence {signals.cv_confidence:.2f}. "
         f"The structured model predicts {signals.numeric_class}."
     )
+    if signals.cv_edibility:
+        explanation += f" The species mapping marks this as {signals.cv_edibility}."
+    if signals.conflict_detected:
+        explanation += " The CV and numeric signals disagree, so the safety policy blocks cooking guidance."
     safety_warning = (
         "Wild mushrooms can be dangerous to eat, and visual similarity is not a reliable safety check. "
         "Treat this result as educational only."
@@ -150,6 +164,9 @@ def generate_mushroom_advice(
         numeric_edible_probability=(
             None if numeric_result.get("edible_probability") is None else float(numeric_result["edible_probability"])
         ),
+        common_name=(None if cv_result.get("common_name") is None else str(cv_result.get("common_name"))),
+        cv_edibility=(None if cv_result.get("cv_edibility") is None else str(cv_result.get("cv_edibility"))),
+        conflict_detected=bool(cv_result.get("conflict_detected", False)),
     )
     allow_cooking = should_allow_cooking(signals)
     prompt = build_prompt_a(signals) if prompt_variant.upper() == "A" else build_prompt_b(signals)
@@ -204,6 +221,9 @@ def compare_prompt_strategies(
         numeric_edible_probability=(
             None if numeric_result.get("edible_probability") is None else float(numeric_result["edible_probability"])
         ),
+        common_name=(None if cv_result.get("common_name") is None else str(cv_result.get("common_name"))),
+        cv_edibility=(None if cv_result.get("cv_edibility") is None else str(cv_result.get("cv_edibility"))),
+        conflict_detected=bool(cv_result.get("conflict_detected", False)),
     )
     allow_cooking = should_allow_cooking(signals)
     response_a = generate_mushroom_advice(cv_result, numeric_result, api_key=api_key, model=model, prompt_variant="A")
@@ -215,9 +235,12 @@ def compare_prompt_strategies(
     return {
         "signals": {
             "species": signals.species,
+            "common_name": signals.common_name,
             "cv_confidence": signals.cv_confidence,
+            "cv_edibility": signals.cv_edibility,
             "numeric_prediction": signals.numeric_class,
             "numeric_edible_probability": signals.numeric_edible_probability,
+            "conflict_detected": signals.conflict_detected,
             "allow_cooking": allow_cooking,
         },
         "prompt_a": response_a,

@@ -148,17 +148,6 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
         model_path = CV_MODEL_PATH
         cv_result = predict_image(image_path, model_path, top_k=1)
 
-    numeric_result = predict_numeric_sample(feature_json)
-    advice = generate_mushroom_advice(cv_result, numeric_result, api_key=api_key, model=openai_model, prompt_variant="B")
-    prompt_comparison = compare_prompt_strategies(cv_result, numeric_result, api_key=api_key, model=openai_model)
-
-    signals = prompt_comparison["signals"]
-    high_trust = signals["allow_cooking"]
-
-    # Build a friendly summary using species metadata when available
-    summary_lines = ["## Mushroom AI Assistant Results\n"]
-
-    # Extract prediction info (support top-k and single outputs)
     top_k_list = []
     main_pred = None
     main_conf = None
@@ -170,6 +159,25 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
     else:
         main_pred = cv_result.get("predicted_class")
         main_conf = float(cv_result.get("confidence")) if cv_result.get("confidence") is not None else None
+
+    cv_result_for_llm = dict(cv_result) if isinstance(cv_result, dict) else {}
+    if main_pred is not None:
+        cv_result_for_llm["predicted_class"] = main_pred
+        cv_result_for_llm["species"] = main_pred
+    if main_conf is not None:
+        cv_result_for_llm["confidence"] = main_conf
+    if top_k_list:
+        cv_result_for_llm["top_k"] = top_k_list
+
+    numeric_result = predict_numeric_sample(feature_json)
+    advice = generate_mushroom_advice(cv_result_for_llm, numeric_result, api_key=api_key, model=openai_model, prompt_variant="B")
+    prompt_comparison = compare_prompt_strategies(cv_result_for_llm, numeric_result, api_key=api_key, model=openai_model)
+
+    signals = prompt_comparison["signals"]
+    high_trust = signals["allow_cooking"]
+
+    # Build a friendly summary using species metadata when available
+    summary_lines = ["## Mushroom AI Assistant Results\n"]
 
     if main_pred:
         summary_lines.append(f"**CV prediction:** {main_pred} ({(main_conf or 0):.2%})\n")
@@ -183,9 +191,11 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
 
     # Species metadata (common name, edibility, cookable)
     species_meta = get_species_info(main_pred) if main_pred else None
+    cv_edibility = None
     if species_meta:
+        cv_edibility = species_meta.get("edibility")
         summary_lines.append(f"**Common name:** {species_meta.get('common_name')}\n")
-        summary_lines.append(f"**Edibility:** {species_meta.get('edibility')}\n")
+        summary_lines.append(f"**Edibility:** {cv_edibility}\n")
         summary_lines.append(f"**Cookable:** {species_meta.get('cookable')}\n")
 
     summary_lines.append(f"**Numeric prediction:** {numeric_result['predicted_label']}")
@@ -199,7 +209,7 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
     if species_meta and species_meta.get("edibility"):
         cv_claim = str(species_meta.get("edibility")).lower()
     else:
-        cv_label = cv_result.get("predicted_class") if isinstance(cv_result, dict) else None
+        cv_label = cv_result_for_llm.get("predicted_class") if isinstance(cv_result_for_llm, dict) else None
         if cv_label:
             cv_label_lower = str(cv_label).lower()
             if cv_label_lower in {"poisonous", "poison", "toxic"}:
@@ -211,6 +221,12 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
 
     # If CV and numeric disagree (CV says poisonous and numeric says edible), show a clear conflict block
     conflict = cv_claim is not None and numeric_claim is not None and cv_claim != numeric_claim
+
+    if isinstance(cv_result_for_llm, dict):
+        cv_result_for_llm["common_name"] = species_meta.get("common_name") if species_meta else None
+        cv_result_for_llm["cv_edibility"] = cv_edibility
+        cv_result_for_llm["conflict_detected"] = conflict
+
     if conflict and cv_claim == "poisonous" and numeric_claim == "edible":
         summary += (
             "\n\n**Conflict detected:**\n"

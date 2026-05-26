@@ -63,3 +63,15 @@ Hugging Face Spaces deployment notes
 License / Attribution
 
 See project header and documentation for dataset attributions and licenses. If you add third-party checkpoints, ensure compliance with their licenses.
+
+Limitations
+
+- Top-1 species accuracy is limited by visual similarity and domain shift; rely on top-k for candidate lists.
+- The numeric model uses only structured features and can disagree with image-based predictions.
+- The system is for educational/demo purposes and must not be used as a sole source for foraging decisions.
+
+Future improvements
+
+- Add calibration of model confidences and uncertainty estimates.
+- Expand the dataset for under-represented species and add controlled field-photo evaluation.
+- Integrate user feedback loop to collect correction labels and improve the species taxonomy over time.

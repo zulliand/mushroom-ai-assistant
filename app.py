@@ -170,39 +170,11 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
         cv_result_for_llm["top_k"] = top_k_list
 
     numeric_result = predict_numeric_sample(feature_json)
-    advice = generate_mushroom_advice(cv_result_for_llm, numeric_result, api_key=api_key, model=openai_model, prompt_variant="B")
-    prompt_comparison = compare_prompt_strategies(cv_result_for_llm, numeric_result, api_key=api_key, model=openai_model)
-
-    signals = prompt_comparison["signals"]
-    high_trust = signals["allow_cooking"]
-
-    # Build a friendly summary using species metadata when available
-    summary_lines = ["## Mushroom AI Assistant Results\n"]
-
-    if main_pred:
-        summary_lines.append(f"**CV prediction:** {main_pred} ({(main_conf or 0):.2%})\n")
-    else:
-        summary_lines.append("**CV prediction:** (no prediction)\n")
-
-    # Top-3 display
-    if top_k_list:
-        top3_text = ", ".join([f"{p['class']} ({p['confidence']:.2%})" for p in top_k_list[:3]])
-        summary_lines.append(f"**Top-3 species:** {top3_text}\n")
-
     # Species metadata (common name, edibility, cookable)
     species_meta = get_species_info(main_pred) if main_pred else None
     cv_edibility = None
     if species_meta:
         cv_edibility = species_meta.get("edibility")
-        summary_lines.append(f"**Common name:** {species_meta.get('common_name')}\n")
-        summary_lines.append(f"**Edibility:** {cv_edibility}\n")
-        summary_lines.append(f"**Cookable:** {species_meta.get('cookable')}\n")
-
-    summary_lines.append(f"**Numeric prediction:** {numeric_result['predicted_label']}")
-    if numeric_result.get("edible_probability") is not None:
-        summary_lines[-1] += f" ({numeric_result['edible_probability']:.2%} edible probability)"
-
-    summary = "\n".join(summary_lines)
 
     # Determine whether CV expresses an edibility claim (from species metadata or binary CV)
     cv_claim = None
@@ -226,6 +198,36 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
         cv_result_for_llm["common_name"] = species_meta.get("common_name") if species_meta else None
         cv_result_for_llm["cv_edibility"] = cv_edibility
         cv_result_for_llm["conflict_detected"] = conflict
+
+    advice = generate_mushroom_advice(cv_result_for_llm, numeric_result, api_key=api_key, model=openai_model, prompt_variant="B")
+    prompt_comparison = compare_prompt_strategies(cv_result_for_llm, numeric_result, api_key=api_key, model=openai_model)
+
+    signals = prompt_comparison["signals"]
+    high_trust = signals["allow_cooking"]
+
+    # Build a friendly summary using species metadata when available
+    summary_lines = ["## Mushroom AI Assistant Results\n"]
+
+    if main_pred:
+        summary_lines.append(f"**CV prediction:** {main_pred} ({(main_conf or 0):.2%})\n")
+    else:
+        summary_lines.append("**CV prediction:** (no prediction)\n")
+
+    # Top-3 display
+    if top_k_list:
+        top3_text = ", ".join([f"{p['class']} ({p['confidence']:.2%})" for p in top_k_list[:3]])
+        summary_lines.append(f"**Top-3 species:** {top3_text}\n")
+
+    if species_meta:
+        summary_lines.append(f"**Common name:** {species_meta.get('common_name')}\n")
+        summary_lines.append(f"**Edibility:** {cv_edibility}\n")
+        summary_lines.append(f"**Cookable:** {species_meta.get('cookable')}\n")
+
+    summary_lines.append(f"**Numeric prediction:** {numeric_result['predicted_label']}")
+    if numeric_result.get("edible_probability") is not None:
+        summary_lines[-1] += f" ({numeric_result['edible_probability']:.2%} edible probability)"
+
+    summary = "\n".join(summary_lines)
 
     if conflict and cv_claim == "poisonous" and numeric_claim == "edible":
         summary += (

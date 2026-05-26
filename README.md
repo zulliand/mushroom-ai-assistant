@@ -1,77 +1,270 @@
-# Mushroom AI Assistant — Final Status
+# Mushroom AI Assistant
 
-This repository contains the final code and documentation for the Mushroom AI Assistant (semester project). The project integrates three cooperating AI blocks to assess mushroom images and structured observations, provide explainable outputs and enforce a safety-first policy.
+The Mushroom AI Assistant is an educational AI system that combines Computer Vision, Numeric Machine Learning and NLP to analyse mushroom images and structured mushroom attributes.
 
-Key components
+The application predicts mushroom species, estimates edibility from structured observations, generates explanations via a Large Language Model (LLM) and applies safety logic to avoid unsafe recommendations.
 
-- **Computer Vision (species recognition):** transfer-learning model for mushroom species classification (final model: ResNet18, 169 classes).
-- **Structured numeric ML model:** tabular classifier trained on the UCI Mushroom Classification CSV for edible/poisonous predictions from structured features.
-- **LLM/NLP layer:** OpenAI-based explanation and safety layer that receives both CV and numeric signals, explains results and blocks unsafe recommendations when models disagree.
+---
 
-Datasets used
+## Project Overview
 
-1. UCI Mushroom Classification Dataset
-	- Purpose: Structured feature prediction (Numeric ML)
+This repository contains the final implementation and documentation for the Mushroom AI Assistant semester project.
 
-2. Edible & Poisonous Mushroom Classification Dataset
-	- Purpose: Initial binary computer vision baseline
+The project integrates three cooperating AI components:
 
-3. Mushroom Species Recognition Dataset
-	- Purpose: Fine-grained species recognition (169 classes) — final computer vision model
+### 1. Computer Vision (Species Recognition)
 
-Final species model (report)
+Transfer learning model for mushroom species recognition from images.
 
-- Model architecture: ResNet18 (transfer learning)
+Final model:
+
+- Architecture: ResNet18
+- Fine-grained classification
+- 169 mushroom species classes
+- Top-k candidate predictions
+- Species confidence estimation
+
+### 2. Structured Numeric Machine Learning
+
+Tabular classification model trained on structured mushroom attributes.
+
+Purpose:
+
+- Predict edible vs poisonous mushrooms
+- Use structured mushroom observations
+- Provide independent validation signal
+- Enable conflict detection against image predictions
+
+### 3. NLP / LLM Safety Layer
+
+OpenAI-based explanation and safety component.
+
+Responsibilities:
+
+- Explain predictions
+- Compare CV and numeric model outputs
+- Detect conflicting predictions
+- Block unsafe recommendations
+- Enforce conservative safety policies
+
+---
+
+## System Architecture
+
+```
+Image
+ ↓
+Computer Vision Model
+ ↓
+Species prediction + confidence
+ ↓
+Conflict Detection
+ ↑
+Numeric ML Model ← Structured Features JSON
+ ↓
+LLM Explanation Layer
+ ↓
+Safety Gating
+ ↓
+Final Output
+```
+
+---
+
+## Datasets Used
+
+| Dataset | Purpose | Data Type |
+|----------|----------|------------|
+| UCI Mushroom Classification Dataset | Structured edible / poisonous prediction | Numeric CSV |
+| Edible & Poisonous Mushroom Classification Dataset | Initial binary computer vision baseline | Images |
+| Mushroom Species Recognition Dataset | Fine-grained species recognition (final CV model) | Images |
+
+The project intentionally uses datasets that were not part of the semester exercises.
+
+---
+
+## Final Species Recognition Model
+
+### Model Configuration
+
+- Architecture: ResNet18 (transfer learning)
 - Number of classes: 169
-- Training samples used (approx): 30,000
+- Training samples used: ~30,000
 - Validation samples: 6,000
 - Test samples: 6,000
-- Training epochs (final run): 15
-- Test metrics:
-	- Top-1 accuracy: 53.45%
-	- Top-3 accuracy: 74.40%
-	- Top-5 accuracy: 82.17%
+- Final training epochs: 15
 
-Notes about artifacts and deployment
+### Final Metrics
 
-- The repository does not contain large datasets; these must be provided separately according to the data layout used by the scripts.
-- Trained model checkpoints are referenced in `models/` metadata files but large checkpoint files are not committed here by default.
-- When deploying to Hugging Face Spaces, do NOT commit API keys or `.env` files. Instead configure runtime secrets as described below.
+| Metric | Result |
+|---------|---------|
+| Top-1 Accuracy | 53.45% |
+| Top-3 Accuracy | 74.40% |
+| Top-5 Accuracy | 82.17% |
 
-Quick start
+The species recognition task contains 169 visually similar mushroom classes. Therefore, Top-k metrics provide more informative performance indicators than Top-1 accuracy alone.
 
-1. Install requirements:
+---
+
+## Safety Design
+
+The application intentionally blocks unsafe outputs.
+
+Cooking recommendations are blocked when:
+
+- Model confidence is too low
+- Computer Vision and Numeric ML predictions disagree
+- Potentially poisonous species are detected
+- Safety thresholds are not met
+
+This conservative design prioritises safety over aggressive prediction behaviour.
+
+---
+
+## Features
+
+### Computer Vision
+
+- Mushroom species recognition
+- Top-k predictions
+- Confidence estimation
+- Transfer learning pipeline
+
+### Numeric Machine Learning
+
+- Structured feature classification
+- Edible vs poisonous prediction
+- Probability estimation
+
+### NLP Layer
+
+- Prediction explanation
+- Safety messaging
+- Prompt comparison
+- Conflict analysis
+
+### Integrated Safety Logic
+
+- Conflict detection
+- Recommendation blocking
+- Educational disclaimers
+
+---
+
+## Quick Start
+
+### Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Provide required artifacts (models + numeric pipeline) and datasets under `models/` and `data/` as needed.
+### Required artifacts
 
-3. Run the app locally:
+Provide:
+
+- Model files
+- Numeric ML pipeline
+- Dataset files (if training locally)
+
+Expected structure:
+
+```
+models/
+data/
+```
+
+### Run locally
 
 ```bash
 py app.py
 ```
 
-Hugging Face Spaces deployment notes
+Open:
 
-- Set `OPENAI_API_KEY` as a Space secret (do not commit it into the repo).
-- Large datasets are not included in the Space; use external storage or dataset downloads during build if required.
-- Only deploy the minimal runtime files (app, models metadata, small model artifacts you are comfortable hosting). See `documentation.md` for more details.
+```
+http://localhost:7860
+```
 
-License / Attribution
+---
 
-See project header and documentation for dataset attributions and licenses. If you add third-party checkpoints, ensure compliance with their licenses.
+## Hugging Face Deployment
 
-Limitations
+For deployment to Hugging Face Spaces:
 
-- Top-1 species accuracy is limited by visual similarity and domain shift; rely on top-k for candidate lists.
-- The numeric model uses only structured features and can disagree with image-based predictions.
-- The system is for educational/demo purposes and must not be used as a sole source for foraging decisions.
+### Required Secret
 
-Future improvements
+Configure:
 
-- Add calibration of model confidences and uncertainty estimates.
-- Expand the dataset for under-represented species and add controlled field-photo evaluation.
-- Integrate user feedback loop to collect correction labels and improve the species taxonomy over time.
+```
+OPENAI_API_KEY
+```
+
+Do NOT commit:
+
+- API keys
+- .env files
+- Large datasets
+- Training folders
+
+Large datasets are intentionally excluded from the repository.
+
+---
+
+## Repository Notes
+
+The repository excludes:
+
+- Raw datasets
+- Species image folders
+- Large checkpoints
+- Temporary training artifacts
+
+Model metadata remains included for reproducibility.
+
+---
+
+## Limitations
+
+- Top-1 species accuracy remains challenging due to visual similarity between mushroom species.
+- Field photographs introduce domain shift caused by lighting, background clutter, camera quality and viewpoint variation.
+- The numeric model relies solely on structured attributes and may disagree with image-based predictions.
+- Confidence calibration remains limited.
+- The system is intended for educational purposes only.
+
+This application must NOT be used as the sole basis for real-world mushroom foraging decisions.
+
+---
+
+## Future Improvements
+
+Potential future work:
+
+- Confidence calibration and uncertainty estimation
+- Expanded dataset coverage for underrepresented species
+- Additional field-photo evaluation
+- Improved species balancing
+- User feedback loop for correction labels
+- Taxonomy refinement
+- Model ensemble approaches
+- Additional safety verification layers
+
+---
+
+## License and Attribution
+
+Please refer to dataset providers and source repositories for licensing information.
+
+Datasets used remain attributed to their original creators.
+
+---
+
+## Educational Disclaimer
+
+This project was developed for educational purposes as part of a university semester project.
+
+Predictions may be incorrect.
+
+Wild mushrooms can be dangerous.
+
+Always consult qualified experts before consuming wild mushrooms.

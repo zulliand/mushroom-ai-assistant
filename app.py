@@ -24,35 +24,58 @@ from utils import (
 )
 
 LOGGER = logging.getLogger("mushroom.app")
+EXAMPLES_DIR = Path(__file__).resolve().parent / "data" / "examples"
 
 DEFAULT_FEATURE_TEMPLATE = {
-    "cap_shape": "x",
-    "cap_surface": "s",
-    "cap_color": "n",
-    "bruises": "t",
-    "odor": "n",
-    "gill_attachment": "f",
-    "gill_spacing": "c",
-    "gill_size": "b",
-    "gill_color": "k",
-    "stalkshape": "e",
-    "stalk_root": "b",
-    "stalk_surface_above_ring": "s",
-    "stalk_surface_below_ring": "s",
-    "stalk_color_above_ring": "w",
-    "stalk_color_below_ring": "w",
-    "veil_type": "p",
-    "veil_color": "w",
-    "ring_number": "o",
-    "ring_type": "p",
-    "spore_print_color": "k",
-    "population": "s",
-    "habitat": "u",
+    "cap-diameter": 15.0,
+    "cap-shape": "x",
+    "cap-surface": "g",
+    "cap-color": "o",
+    "does-bruise-or-bleed": "f",
+    "gill-attachment": "e",
+    "gill-spacing": "",
+    "gill-color": "w",
+    "stem-height": 17.0,
+    "stem-width": 17.0,
+    "stem-root": "s",
+    "stem-surface": "y",
+    "stem-color": "w",
+    "veil-type": "u",
+    "veil-color": "w",
+    "has-ring": "t",
+    "ring-type": "p",
+    "spore-print-color": "",
+    "habitat": "d",
+    "season": "w",
 }
+
+DEFAULT_FEATURE_JSON = json.dumps(DEFAULT_FEATURE_TEMPLATE, indent=2)
 
 NUMERIC_FEATURE_ORDER = list(DEFAULT_FEATURE_TEMPLATE.keys())
 NUMERIC_CLASS_LABELS = {0: "edible", 1: "poisonous"}
-FEATURE_ALIASES = {"stalk_shape": "stalkshape"}
+NUMERIC_VALUE_COLUMNS = {"cap-diameter", "stem-height", "stem-width"}
+FEATURE_ALIASES = {
+    "cap_diameter": "cap-diameter",
+    "cap_shape": "cap-shape",
+    "cap_surface": "cap-surface",
+    "cap_color": "cap-color",
+    "does_bruise_or_bleed": "does-bruise-or-bleed",
+    "gill_attachment": "gill-attachment",
+    "gill_spacing": "gill-spacing",
+    "gill_color": "gill-color",
+    "stem_height": "stem-height",
+    "stem_width": "stem-width",
+    "stem_root": "stem-root",
+    "stem_surface": "stem-surface",
+    "stem_color": "stem-color",
+    "veil_type": "veil-type",
+    "veil_color": "veil-color",
+    "has_ring": "has-ring",
+    "ring_type": "ring-type",
+    "spore_print_color": "spore-print-color",
+    "habitat": "habitat",
+    "season": "season",
+}
 
 
 def get_openai_api_key(fallback: str = "") -> str:
@@ -103,7 +126,35 @@ def build_numeric_frame(feature_json: str) -> pd.DataFrame:
 
     features = normalize_feature_names(parse_feature_payload(feature_json))
     row = {column: features.get(column, DEFAULT_FEATURE_TEMPLATE[column]) for column in NUMERIC_FEATURE_ORDER}
-    return pd.DataFrame([row], columns=NUMERIC_FEATURE_ORDER)
+    frame = pd.DataFrame([row], columns=NUMERIC_FEATURE_ORDER)
+
+    # Coerce expected numeric features before model inference.
+    for column in NUMERIC_VALUE_COLUMNS:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce")
+
+    return frame
+
+
+def is_default_numeric_input(feature_json: str) -> bool:
+    """Check whether the structured input only contains internal fallback defaults."""
+
+    normalized_features = normalize_feature_names(parse_feature_payload(feature_json))
+    if not normalized_features:
+        return True
+
+    for column in NUMERIC_FEATURE_ORDER:
+        default_value = DEFAULT_FEATURE_TEMPLATE[column]
+        current_value = normalized_features.get(column, default_value)
+        if column in NUMERIC_VALUE_COLUMNS:
+            try:
+                if float(current_value) != float(default_value):
+                    return False
+            except (TypeError, ValueError):
+                return False
+        elif str(current_value) != str(default_value):
+            return False
+
+    return True
 
 
 def predict_numeric_sample(feature_json: str) -> Dict[str, object]:
@@ -112,32 +163,67 @@ def predict_numeric_sample(feature_json: str) -> Dict[str, object]:
     pipeline = load_numeric_pipeline()
     metadata = load_numeric_metadata()
     frame = build_numeric_frame(feature_json)
+    default_input = is_default_numeric_input(feature_json)
     prediction = int(pipeline.predict(frame)[0])
     probabilities = pipeline.predict_proba(frame)[0] if hasattr(pipeline, "predict_proba") else None
 
+    class_labels = metadata.get("label_classes") if isinstance(metadata.get("label_classes"), list) else None
+
+    predicted_label = NUMERIC_CLASS_LABELS.get(prediction, str(prediction))
+    if class_labels and 0 <= prediction < len(class_labels):
+        raw_label = str(class_labels[prediction]).strip().lower()
+        if raw_label in {"e", "edible", "1", "true"}:
+            predicted_label = "edible"
+        elif raw_label in {"p", "poisonous", "0", "false"}:
+            predicted_label = "poisonous"
+        else:
+            predicted_label = raw_label
+
     edible_probability = None
     if probabilities is not None:
-        class_labels = metadata.get("label_classes") or ["e", "p"]
-        edible_index = 0 if class_labels and str(class_labels[0]).lower() in {"e", "edible"} else None
+        effective_labels = class_labels or ["e", "p"]
+        edible_index = 0 if effective_labels and str(effective_labels[0]).lower() in {"e", "edible"} else None
         if edible_index is None and len(probabilities) > 1:
             edible_index = 1
         if edible_index is not None:
             edible_probability = float(probabilities[edible_index])
 
-    predicted_label = NUMERIC_CLASS_LABELS.get(prediction, str(prediction))
     return {
         "predicted_label": predicted_label,
         "edible_probability": edible_probability,
         "probabilities": None if probabilities is None else probabilities.tolist(),
         "features": frame.iloc[0].to_dict(),
+        "feature_source": "default-feature fallback" if default_input else "user-provided structured features",
+        "default_features_used": default_input,
     }
 
 
-def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model: str) -> Tuple[str, Dict[str, object], Dict[str, object], Dict[str, object], Dict[str, object]]:
+def _shorten_text(text: object, max_length: int = 220) -> str:
+    """Trim long text for the compact summary view."""
+
+    if text is None:
+        return "—"
+    value = str(text).strip()
+    if not value:
+        return "—"
+    if len(value) <= max_length:
+        return value
+    return value[: max_length - 1].rstrip() + "…"
+
+
+def run_assistant(
+    image_path: str,
+    description_text: str,
+    feature_json: str,
+    api_key: str,
+    openai_model: str,
+) -> Tuple[str, Dict[str, object], Dict[str, object], Dict[str, object], Dict[str, object], Dict[str, object]]:
     """Run the three-stage assistant and return user-facing outputs."""
 
     if not image_path:
         raise ValueError("Please upload a mushroom image before running the assistant.")
+
+    _ = description_text
 
     # Prefer species-level model if available, otherwise fall back to binary CV model
     if SPECIES_CV_MODEL_PATH.exists():
@@ -170,6 +256,7 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
         cv_result_for_llm["top_k"] = top_k_list
 
     numeric_result = predict_numeric_sample(feature_json)
+    numeric_default_based = bool(numeric_result.get("default_features_used"))
     # Species metadata (common name, edibility, cookable)
     species_meta = get_species_info(main_pred) if main_pred else None
     cv_edibility = None
@@ -190,9 +277,14 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
                 cv_claim = "edible"
 
     numeric_claim = str(numeric_result.get("predicted_label")).lower() if numeric_result.get("predicted_label") is not None else None
+    species_mapping_claim = str(cv_edibility).lower() if cv_edibility else None
 
-    # If CV and numeric disagree (CV says poisonous and numeric says edible), show a clear conflict block
-    conflict = cv_claim is not None and numeric_claim is not None and cv_claim != numeric_claim
+    # If the numeric model is only seeing fallback defaults, it stays auxiliary.
+    conflict = False
+    if species_mapping_claim is not None and numeric_claim is not None and not numeric_default_based:
+        conflict = species_mapping_claim != numeric_claim
+    elif cv_claim is not None and numeric_claim is not None and not numeric_default_based:
+        conflict = cv_claim != numeric_claim
 
     if isinstance(cv_result_for_llm, dict):
         cv_result_for_llm["common_name"] = species_meta.get("common_name") if species_meta else None
@@ -213,6 +305,8 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
     else:
         summary_lines.append("**CV prediction:** (no prediction)\n")
 
+    summary_lines.append(f"**Confidence:** {(main_conf if main_conf is not None else 0):.2%}\n" if main_conf is not None else "**Confidence:** —\n")
+
     # Top-3 display
     if top_k_list:
         top3_text = ", ".join([f"{p['class']} ({p['confidence']:.2%})" for p in top_k_list[:3]])
@@ -220,83 +314,148 @@ def run_assistant(image_path: str, feature_json: str, api_key: str, openai_model
 
     if species_meta:
         summary_lines.append(f"**Common name:** {species_meta.get('common_name')}\n")
-        summary_lines.append(f"**Edibility:** {cv_edibility}\n")
+        summary_lines.append(f"**Species mapping:** {cv_edibility}\n")
         summary_lines.append(f"**Cookable:** {species_meta.get('cookable')}\n")
 
-    summary_lines.append(f"**Numeric prediction:** {numeric_result['predicted_label']}")
+    numeric_line = f"**Numeric prediction:** {numeric_result['predicted_label']}"
     if numeric_result.get("edible_probability") is not None:
-        summary_lines[-1] += f" ({numeric_result['edible_probability']:.2%} edible probability)"
+        numeric_line += f" ({numeric_result['edible_probability']:.2%} edible probability)"
+    if numeric_default_based:
+        numeric_line += " - auxiliary only (default features)"
+    summary_lines.append(numeric_line)
 
     summary = "\n".join(summary_lines)
 
-    if conflict and cv_claim == "poisonous" and numeric_claim == "edible":
-        summary += (
-            "\n\n**Conflict detected:**\n"
-            "Computer vision predicts poisonous species.\n"
-            f"CV prediction: {main_pred} — {(main_conf or 0):.1%}\n"
-            "Structured feature model predicts edible.\n"
-            f"Structured-model estimate: {numeric_result.get('edible_probability'):.1%} edible (from CSV model, not the image)\n\n"
-            "**Result withheld due to disagreement.**\n"
-        )
+    if species_mapping_claim == "poisonous":
+        final_safety_decision = "Poisonous species detected"
+        consumption_advice = "withheld for safety"
+    elif species_mapping_claim == "edible":
+        final_safety_decision = "Likely edible species detected"
+        consumption_advice = "withheld for safety"
+    elif conflict and cv_claim == "poisonous" and numeric_claim == "edible":
+        final_safety_decision = "Consumption advice withheld for safety"
+        consumption_advice = "withheld for safety"
     else:
-        summary += (
-            f"\n\n**Decision logic:** {'High-trust path enabled' if high_trust else 'High-trust path blocked'}"
-            f"\n\n**Prompt strategy chosen:** {advice.get('prompt_variant', 'B')}"
-        )
+        CONFIDENCE_THRESHOLD = 0.75
+        if high_trust and main_conf is not None and main_conf >= CONFIDENCE_THRESHOLD and not conflict:
+            final_safety_decision = "Consumption advice withheld for safety"
+            consumption_advice = "withheld for safety"
+        else:
+            final_safety_decision = "Consumption advice withheld for safety"
+            consumption_advice = "withheld for safety"
 
     summary += (
-        f"\n\n**LLM explanation:** {advice.get('explanation')}\n\n"
-        f"**Safety warning:** {advice.get('safety_warning')}\n\n"
+        "\n\n**Final safety decision:** " + final_safety_decision +
+        f"\n**Consumption advice:** {consumption_advice}" +
+        f"\n**LLM explanation:** {_shorten_text(advice.get('explanation'))}"
     )
 
-    # Only include cooking suggestions if safety logic allows and confidence threshold passed
-    CONFIDENCE_THRESHOLD = 0.75
-    if high_trust and main_conf is not None and main_conf >= CONFIDENCE_THRESHOLD:
-        summary += f"**Cooking suggestions:** {advice.get('cooking_suggestions')}\n\n"
-    else:
-        summary += "**Cooking suggestions:** (not shown due to low confidence or safety)\n\n"
-
-    summary += f"**Disclaimer:** {advice.get('disclaimer')}"
-
-    return summary, cv_result, numeric_result, advice, prompt_comparison
+    return summary, cv_result, numeric_result, advice, prompt_comparison, numeric_result.get("features", {})
 
 
 def build_interface() -> gr.Blocks:
     """Create the Gradio UI."""
 
     setup_logging()
-    with gr.Blocks(theme=gr.themes.Soft(), title="Mushroom AI Assistant") as demo:
-        gr.Markdown(
-            "# Mushroom AI Assistant\n"
-            "Upload a mushroom image, provide structured mushroom features as JSON, and get an integrated safety assessment with prompt comparison."
-        )
-        with gr.Row():
-            with gr.Column(scale=1):
-                image_input = gr.Image(type="filepath", label="Mushroom image")
-                feature_input = gr.Textbox(
-                    label="Structured mushroom features as JSON",
-                    lines=16,
-                    value=json.dumps(DEFAULT_FEATURE_TEMPLATE, indent=2),
-                    placeholder='{"cap_shape": "x", "odor": "n", "habitat": "u"}',
-                )
-                api_key_input = gr.Textbox(label="OpenAI API key override", type="password", value="")
-                model_input = gr.Textbox(label="OpenAI model", value="gpt-4o-mini")
-                run_button = gr.Button("Analyze mushroom", variant="primary")
-            with gr.Column(scale=1):
-                summary_output = gr.Markdown(label="Integrated assessment")
-                cv_output = gr.JSON(label="Computer vision output")
-                numeric_output = gr.JSON(label="Numeric model output")
-                llm_output = gr.JSON(label="LLM output")
-                comparison_output = gr.JSON(label="Prompt comparison")
+    css = """
+    .gradio-container {
+        background: linear-gradient(180deg, #f6f3ec 0%, #f9faf7 48%, #ffffff 100%);
+    }
+    .app-shell {
+        max-width: 1300px;
+        margin: 0 auto;
+    }
+    .hero-card {
+        padding: 1.2rem 1.35rem;
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(245,240,228,0.92));
+        border: 1px solid rgba(85, 74, 56, 0.12);
+        box-shadow: 0 12px 30px rgba(54, 45, 28, 0.08);
+        margin-bottom: 1rem;
+    }
+    .summary-card {
+        padding: 1rem 1.1rem;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid rgba(85, 74, 56, 0.12);
+        box-shadow: 0 10px 24px rgba(54, 45, 28, 0.07);
+        font-size: 1.02rem;
+        line-height: 1.6;
+    }
+    .summary-card h3 {
+        margin-top: 0;
+        margin-bottom: 0.7rem;
+    }
+    .summary-card strong {
+        color: #2f281d;
+    }
+    .compact-accordion {
+        margin-top: 0.7rem;
+    }
+    """
+    example_images = [str(path) for path in sorted(EXAMPLES_DIR.glob("*")) if path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}]
 
-        def submit(image_path: str, feature_json: str, api_key_override: str, openai_model: str):
+    with gr.Blocks(theme=gr.themes.Soft(), title="Mushroom AI Assistant", css=css) as demo:
+        with gr.Column(elem_classes=["app-shell"]):
+            gr.Markdown(
+                "<div class='hero-card'>"
+                "<h1>Mushroom AI Assistant</h1>"
+                "<p>Upload a mushroom photo, add a short description if you want, and review a concise safety summary with expandable technical details.</p>"
+                "</div>"
+            )
+
+            with gr.Row(equal_height=True):
+                with gr.Column(scale=1, min_width=360):
+                    image_input = gr.Image(
+                        type="filepath",
+                        label="Upload mushroom photo",
+                        sources=["upload"],
+                    )
+                    description_input = gr.Textbox(
+                        label="Optional mushroom description",
+                        placeholder="Example: Red cap with white spots, white stem, growing in the woods.",
+                        lines=3,
+                    )
+                    if example_images:
+                        gr.Examples(
+                            examples=example_images[:4],
+                            inputs=image_input,
+                            label="Example mushrooms",
+                            examples_per_page=4,
+                        )
+
+                    with gr.Accordion("Advanced settings", open=False):
+                        api_key_input = gr.Textbox(label="OpenAI API key override", type="password", value="")
+                        model_input = gr.Textbox(label="OpenAI model", value="gpt-4o-mini")
+
+                    run_button = gr.Button("Analyze mushroom", variant="primary")
+
+                with gr.Column(scale=1, min_width=420):
+                    summary_output = gr.Markdown(elem_classes=["summary-card"])
+
+                    with gr.Accordion("Computer vision output", open=False, elem_classes=["compact-accordion"]):
+                        cv_output = gr.JSON(label="Computer vision output", show_label=False)
+
+                    with gr.Accordion("Numeric model output", open=False, elem_classes=["compact-accordion"]):
+                        numeric_output = gr.JSON(label="Numeric model output", show_label=False)
+
+                    with gr.Accordion("LLM output", open=False, elem_classes=["compact-accordion"]):
+                        llm_output = gr.JSON(label="LLM output", show_label=False)
+
+                    with gr.Accordion("Prompt comparison", open=False, elem_classes=["compact-accordion"]):
+                        comparison_output = gr.JSON(label="Prompt comparison", show_label=False)
+
+                    with gr.Accordion("Structured features JSON", open=False, elem_classes=["compact-accordion"]):
+                        features_output = gr.JSON(label="Structured features JSON", show_label=False)
+
+        def submit(image_path: str, description_text: str, api_key_override: str, openai_model: str):
             combined_key = get_openai_api_key(api_key_override)
-            return run_assistant(image_path, feature_json, combined_key, openai_model)
+            return run_assistant(image_path, description_text, DEFAULT_FEATURE_JSON, combined_key, openai_model)
 
         run_button.click(
             fn=submit,
-            inputs=[image_input, feature_input, api_key_input, model_input],
-            outputs=[summary_output, cv_output, numeric_output, llm_output, comparison_output],
+            inputs=[image_input, description_input, api_key_input, model_input],
+            outputs=[summary_output, cv_output, numeric_output, llm_output, comparison_output, features_output],
         )
     return demo
 

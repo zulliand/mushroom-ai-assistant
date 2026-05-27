@@ -15,22 +15,20 @@ from joblib import dump, load
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 
 from utils import ensure_directory, setup_logging
 
 LOGGER = logging.getLogger("mushroom.numeric")
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_PATH = PROJECT_ROOT / "data" / "Mushroom data.csv"
+DATA_PATH = PROJECT_ROOT / "data" / "secondary_data.csv"
 MODELS_DIR = PROJECT_ROOT / "models"
 PIPELINE_PATH = MODELS_DIR / "mushroom_numeric_pipeline.pkl"
 METRICS_PATH = MODELS_DIR / "numeric_metrics.json"
 TARGET_CANDIDATES = ("class", "target", "label", "edible", "is_edible", "poisonous", "quality")
-POSITIVE_LABELS = {"e", "edible", "poisonous", "p", "1", 1, True}
 
 
 def load_dataset(csv_path: Path = DATA_PATH) -> pd.DataFrame:
@@ -39,7 +37,8 @@ def load_dataset(csv_path: Path = DATA_PATH) -> pd.DataFrame:
     if not csv_path.exists():
         raise FileNotFoundError(f"Structured dataset not found at {csv_path}")
 
-    dataframe = pd.read_csv(csv_path)
+    # secondary_data.csv is semicolon-delimited; auto-detect keeps this compatible.
+    dataframe = pd.read_csv(csv_path, sep=None, engine="python")
     if dataframe.empty:
         raise ValueError(f"Dataset at {csv_path} is empty")
     return dataframe
@@ -97,11 +96,20 @@ def print_eda(dataframe: pd.DataFrame, target_column: str) -> None:
 def build_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
     """Build the preprocessing pipeline for mixed tabular data."""
 
-    categorical_features = list(features.columns)
+    numeric_features = list(features.select_dtypes(include=["number"]).columns)
+    categorical_features = [column for column in features.columns if column not in numeric_features]
+
     try:
         encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
     except TypeError:  # pragma: no cover - compatibility for older scikit-learn versions
         encoder = OneHotEncoder(handle_unknown="ignore", sparse=False)
+
+    numeric_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+        ]
+    )
 
     categorical_pipeline = Pipeline(
         steps=[
@@ -109,24 +117,24 @@ def build_preprocessor(features: pd.DataFrame) -> ColumnTransformer:
             ("encoder", encoder),
         ]
     )
-    return ColumnTransformer(
-        transformers=[("categorical", categorical_pipeline, categorical_features)],
-        remainder="drop",
+    transformers = []
+    if numeric_features:
+        transformers.append(("numeric", numeric_pipeline, numeric_features))
+    if categorical_features:
+        transformers.append(("categorical", categorical_pipeline, categorical_features))
+
+    return ColumnTransformer(transformers=transformers, remainder="drop")
+
+
+def build_model() -> RandomForestClassifier:
+    """Return the random-forest classifier used for tabular prediction."""
+
+    return RandomForestClassifier(
+        n_estimators=300,
+        random_state=42,
+        n_jobs=-1,
+        class_weight="balanced_subsample",
     )
-
-
-def build_models() -> Dict[str, object]:
-    """Return the model candidates we want to compare."""
-
-    return {
-        "RandomForest": RandomForestClassifier(
-            n_estimators=300,
-            random_state=42,
-            n_jobs=-1,
-            class_weight="balanced_subsample",
-        ),
-        "LogisticRegression": LogisticRegression(max_iter=2000, class_weight="balanced"),
-    }
 
 
 def make_pipeline(preprocessor: ColumnTransformer, model: object) -> Pipeline:
@@ -180,49 +188,21 @@ def train_numeric_pipeline(csv_path: Path = DATA_PATH) -> Dict[str, object]:
     target = dataframe[target_column]
     target_values, label_encoder = normalize_target(target)
 
-    x_train_full, x_test, y_train_full, y_test = train_test_split(
+    x_train, x_test, y_train, y_test = train_test_split(
         features,
         target_values,
         test_size=0.2,
         random_state=42,
         stratify=target_values,
     )
-    x_train, x_val, y_train, y_val = train_test_split(
-        x_train_full,
-        y_train_full,
-        test_size=0.2,
-        random_state=42,
-        stratify=y_train_full,
-    )
-
-    preprocessor = build_preprocessor(x_train)
-    model_candidates = build_models()
-    comparison_rows: List[Dict[str, float]] = []
-    fitted_pipelines: Dict[str, Pipeline] = {}
-
-    for name, model in model_candidates.items():
-        pipeline = make_pipeline(preprocessor, model)
-        pipeline.fit(x_train, y_train)
-        fitted_pipelines[name] = pipeline
-        val_metrics = evaluate_model(name, pipeline, x_val, y_val)
-        comparison_rows.append(val_metrics)
-        print(f"{name} F1: {val_metrics['f1']:.2f}")
-        LOGGER.info("%s validation metrics: %s", name, val_metrics)
-
-    comparison_df = pd.DataFrame(comparison_rows).sort_values(by="f1", ascending=False).reset_index(drop=True)
-    print("Model comparison:")
-    print(comparison_df.to_string(index=False))
-
-    best_model_name = comparison_df.iloc[0]["model"]
-    print("Selected model:")
-    print(best_model_name)
-
-    final_model = model_candidates[best_model_name]
-    final_pipeline = make_pipeline(build_preprocessor(x_train_full), final_model)
-    final_pipeline.fit(x_train_full, y_train_full)
-    test_metrics = evaluate_model(best_model_name, final_pipeline, x_test, y_test)
+    model_name = "RandomForest"
+    final_pipeline = make_pipeline(build_preprocessor(x_train), build_model())
+    final_pipeline.fit(x_train, y_train)
+    test_metrics = evaluate_model(model_name, final_pipeline, x_test, y_test)
     test_predictions = final_pipeline.predict(x_test)
 
+    print("Selected model:")
+    print(model_name)
     print("Test metrics:")
     print(pd.DataFrame([test_metrics]).to_string(index=False))
     print_confusion_matrix(y_test, test_predictions, label_encoder)
@@ -236,9 +216,7 @@ def train_numeric_pipeline(csv_path: Path = DATA_PATH) -> Dict[str, object]:
         "rows": int(dataframe.shape[0]),
         "feature_count": int(features.shape[1]),
         "target_distribution": dataframe[target_column].value_counts(dropna=False).to_dict(),
-        "model_comparison": comparison_df.to_dict(orient="records"),
-        "selected_model": best_model_name,
-        "validation_metrics": comparison_df.iloc[0].to_dict(),
+        "selected_model": model_name,
         "test_metrics": test_metrics,
         "label_classes": label_encoder.classes_.tolist(),
         "pipeline_path": str(PIPELINE_PATH),
@@ -249,8 +227,7 @@ def train_numeric_pipeline(csv_path: Path = DATA_PATH) -> Dict[str, object]:
     LOGGER.info("Saved metrics to %s", METRICS_PATH)
 
     return {
-        "selected_model": best_model_name,
-        "validation_metrics": comparison_df.iloc[0].to_dict(),
+        "selected_model": model_name,
         "test_metrics": test_metrics,
         "pipeline_path": str(PIPELINE_PATH),
         "metrics_path": str(METRICS_PATH),
@@ -261,7 +238,7 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for training."""
 
     parser = argparse.ArgumentParser(description="Train the mushroom numeric model.")
-    parser.add_argument("--data-path", type=Path, default=DATA_PATH, help="Path to data/Mushroom data.csv")
+    parser.add_argument("--data-path", type=Path, default=DATA_PATH, help="Path to data/secondary_data.csv")
     return parser.parse_args()
 
 

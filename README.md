@@ -18,7 +18,7 @@ Transfer learning model for mushroom species recognition from images.
 
 Final model:
 
-- Architecture: ResNet18
+- Architecture: EfficientNet-B0
 - Fine-grained classification
 - 169 mushroom species classes
 - Top-k candidate predictions
@@ -81,9 +81,10 @@ Final Output
 
 | Dataset | Purpose | Data Type |
 |----------|----------|------------|
-| UCI Mushroom Classification Dataset | Structured edible / poisonous prediction | Numeric CSV |
-| Edible & Poisonous Mushroom Classification Dataset | Initial binary computer vision baseline | Images |
-| Mushroom Species Recognition Dataset | Fine-grained species recognition (final CV model) | Images |
+| UCI Mushroom Classification Dataset (kaggle.com/datasets/uciml/mushroom-classification) | Exploratory structured analysis | Numeric CSV |
+| Mushroom Edibility Classification (kaggle.com/datasets/devzohaib/mushroom-edibility-classification) | Structured edible / poisonous prediction — final numeric model | Numeric CSV |
+| Edible & Poisonous Mushroom Classification (kaggle.com/datasets/benedictusjason/edible-and-poisonous-mushroom-classification) | Initial binary computer vision baseline | Images |
+| Mushroom Species Recognition (kaggle.com/datasets/zlatan599/mushroom1) | Fine-grained species recognition (final CV model) | Images |
 
 The project intentionally uses datasets that were not part of the semester exercises.
 
@@ -93,12 +94,12 @@ The project intentionally uses datasets that were not part of the semester exerc
 
 ### Model Configuration
 
-- Architecture: ResNet18 (transfer learning)
+- Architecture: EfficientNet-B0 (transfer learning)
 - Number of classes: 169
-- Training samples used: ~30,000
-- Validation samples: 6,000
-- Test samples: 6,000
-- Final training epochs: 15
+- Training samples used: ~40,000
+- Validation samples: ~13,500
+- Test samples: ~13,500
+- Final training epochs: 20
 
 ### Final Metrics
 

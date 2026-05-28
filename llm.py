@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
@@ -13,6 +14,28 @@ LOGGER = logging.getLogger("mushroom.llm")
 DEFAULT_MODEL = "gpt-4o-mini"
 HIGH_CONFIDENCE_THRESHOLD = 0.80
 PROMPT_B_COOKING_THRESHOLD = 0.80
+MUSHROOM_FEATURE_KEYS = (
+    "cap-diameter",
+    "cap-shape",
+    "cap-surface",
+    "cap-color",
+    "does-bruise-or-bleed",
+    "gill-attachment",
+    "gill-spacing",
+    "gill-color",
+    "stem-height",
+    "stem-width",
+    "stem-root",
+    "stem-surface",
+    "stem-color",
+    "veil-type",
+    "veil-color",
+    "has-ring",
+    "ring-type",
+    "spore-print-color",
+    "habitat",
+    "season",
+)
 
 
 @dataclass
@@ -26,11 +49,17 @@ class MushroomSignals:
     common_name: Optional[str] = None
     cv_edibility: Optional[str] = None
     conflict_detected: bool = False
+    numeric_default_based: bool = False
+    numeric_evaluated: bool = True
 
 
 def should_allow_cooking(signals: MushroomSignals) -> bool:
     """Decide whether the assistant may mention cooking ideas."""
 
+    if not signals.numeric_evaluated:
+        return False
+    if signals.numeric_default_based:
+        return False
     if signals.cv_confidence < PROMPT_B_COOKING_THRESHOLD:
         return False
     if signals.numeric_edible_probability is None:
@@ -40,17 +69,122 @@ def should_allow_cooking(signals: MushroomSignals) -> bool:
     return "edible" in signals.numeric_class.lower() or "edible" in signals.species.lower()
 
 
+def call_llm_json(prompt: str, api_key: Optional[str] = None, model: str = DEFAULT_MODEL) -> str:
+    """Call the LLM and return a JSON string response."""
+
+    effective_key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
+    if not effective_key:
+        LOGGER.warning("OpenAI API key not provided, returning empty JSON payload.")
+        return "{}"
+
+    client = OpenAI(api_key=effective_key)
+    response = client.chat.completions.create(
+        model=model,
+        temperature=0.0,
+        response_format={"type": "json_object"},
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "Return only valid JSON. Do not add markdown, commentary, or extra keys unless explicitly requested."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+    )
+    return response.choices[0].message.content or "{}"
+
+
+def parse_json_response(response_text: str, required_keys: tuple[str, ...]) -> Dict[str, Any]:
+    """Parse and normalize a strict JSON response into the requested key set."""
+
+    try:
+        payload = json.loads(response_text)
+    except json.JSONDecodeError:
+        LOGGER.warning("Failed to parse JSON response from LLM.")
+        return {}
+
+    if not isinstance(payload, dict):
+        LOGGER.warning("LLM JSON response was not an object.")
+        return {}
+
+    normalized: Dict[str, Any] = {}
+    for key in required_keys:
+        value = payload.get(key)
+        if isinstance(value, str):
+            stripped = value.strip()
+            normalized[key] = stripped if stripped else None
+        else:
+            normalized[key] = value
+    return normalized
+
+
+def _has_meaningful_feature_values(features: Dict[str, Any]) -> bool:
+    """Check whether at least one extracted value is informative."""
+
+    for value in features.values():
+        if value is None:
+            continue
+        if isinstance(value, str) and value.strip().lower() in {"", "unknown", "null", "none"}:
+            continue
+        return True
+    return False
+
+
+def extract_mushroom_features(description: str, api_key: Optional[str] = None, model: str = DEFAULT_MODEL) -> Dict[str, Any]:
+    """Extract structured mushroom features from a free-text description."""
+
+    if not description.strip():
+        return {}
+
+    prompt = json.dumps(
+        {
+            "instruction": (
+                "Extract only mushroom features that are explicitly mentioned in the description. "
+                "Do not infer uncertain details. If a feature is not mentioned, set it to null or \"unknown\". "
+                "If the description is too vague to extract any useful structured features, return an empty JSON object."
+            ),
+            "description": description.strip(),
+            "required_json_keys": list(MUSHROOM_FEATURE_KEYS),
+            "output_rules": [
+                "Return strict JSON only.",
+                "Use the exact required keys.",
+                "Prefer null over guessing.",
+                "Use numbers for numeric values when explicitly stated.",
+            ],
+        },
+        indent=2,
+    )
+
+    response_text = call_llm_json(prompt, api_key=api_key, model=model)
+    parsed = parse_json_response(response_text, MUSHROOM_FEATURE_KEYS)
+    if not parsed or not _has_meaningful_feature_values(parsed):
+        return {}
+    return parsed
+
+
 def build_context(signals: MushroomSignals) -> Dict[str, Any]:
     """Create a compact, model-agnostic payload for prompt construction."""
 
     allow_cooking = should_allow_cooking(signals)
+    numeric_evaluated = signals.numeric_evaluated
+    if not numeric_evaluated:
+        numeric_signal_mode = "not evaluated"
+    elif signals.numeric_default_based:
+        numeric_signal_mode = "auxiliary only (default features)"
+    else:
+        numeric_signal_mode = "structured user features"
     return {
         "species": signals.species,
         "common_name": signals.common_name,
         "cv_confidence": round(signals.cv_confidence, 4),
         "cv_edibility": signals.cv_edibility,
-        "numeric_prediction": signals.numeric_class,
+        "numeric_prediction": signals.numeric_class if numeric_evaluated else None,
+        "numeric_prediction_raw": signals.numeric_class,
         "numeric_probability": None if signals.numeric_edible_probability is None else round(signals.numeric_edible_probability, 4),
+        "numeric_default_based": signals.numeric_default_based,
+        "numeric_evaluated": numeric_evaluated,
+        "numeric_signal_mode": numeric_signal_mode,
         "allow_cooking": allow_cooking,
         "conflict_detected": signals.conflict_detected,
         "required_disclaimer": "This application is for educational purposes only and must not be used as the sole basis for eating wild mushrooms.",
@@ -78,7 +212,9 @@ def build_prompt_b(signals: MushroomSignals) -> str:
         "context": context,
         "constraints": [
             "Include the CV confidence.",
-            "Include the numeric edible probability.",
+            "If numeric_evaluated is false, say the structured model was not evaluated because no structured features were provided.",
+            "Do not describe numeric_prediction as a real classification when numeric_evaluated is false.",
+            "Include the numeric edible probability only when the numeric model was actually evaluated.",
             f"Only include cooking ideas if allow_cooking is true and both confidences are at least {PROMPT_B_COOKING_THRESHOLD}.",
             "Always include the educational disclaimer.",
         ],
@@ -119,9 +255,16 @@ def fallback_response(signals: MushroomSignals, prompt_variant: str, allow_cooki
     if signals.common_name:
         species_text = f"{signals.species} ({signals.common_name})"
 
+    if not signals.numeric_evaluated:
+        numeric_text = "The structured model was not evaluated because no structured features were provided."
+    elif signals.numeric_default_based:
+        numeric_text = "The structured model was not evaluated because only default fallback features were available."
+    else:
+        numeric_text = f"The structured model predicts {signals.numeric_class}."
+
     explanation = (
         f"Computer vision suggests {species_text} with confidence {signals.cv_confidence:.2f}. "
-        f"The structured model predicts {signals.numeric_class}."
+        + numeric_text
     )
     if signals.cv_edibility:
         explanation += f" The species mapping marks this as {signals.cv_edibility}."
@@ -167,6 +310,8 @@ def generate_mushroom_advice(
         common_name=(None if cv_result.get("common_name") is None else str(cv_result.get("common_name"))),
         cv_edibility=(None if cv_result.get("cv_edibility") is None else str(cv_result.get("cv_edibility"))),
         conflict_detected=bool(cv_result.get("conflict_detected", False)),
+        numeric_default_based=bool(numeric_result.get("default_features_used", False)),
+        numeric_evaluated=bool(numeric_result.get("numeric_evaluated", True)),
     )
     allow_cooking = should_allow_cooking(signals)
     prompt = build_prompt_a(signals) if prompt_variant.upper() == "A" else build_prompt_b(signals)
@@ -224,6 +369,8 @@ def compare_prompt_strategies(
         common_name=(None if cv_result.get("common_name") is None else str(cv_result.get("common_name"))),
         cv_edibility=(None if cv_result.get("cv_edibility") is None else str(cv_result.get("cv_edibility"))),
         conflict_detected=bool(cv_result.get("conflict_detected", False)),
+        numeric_default_based=bool(numeric_result.get("default_features_used", False)),
+        numeric_evaluated=bool(numeric_result.get("numeric_evaluated", True)),
     )
     allow_cooking = should_allow_cooking(signals)
     response_a = generate_mushroom_advice(cv_result, numeric_result, api_key=api_key, model=model, prompt_variant="A")
@@ -240,6 +387,8 @@ def compare_prompt_strategies(
             "cv_edibility": signals.cv_edibility,
             "numeric_prediction": signals.numeric_class,
             "numeric_edible_probability": signals.numeric_edible_probability,
+            "numeric_default_based": signals.numeric_default_based,
+            "numeric_signal_mode": "auxiliary only (default features)" if signals.numeric_default_based else "structured user features",
             "conflict_detected": signals.conflict_detected,
             "allow_cooking": allow_cooking,
         },

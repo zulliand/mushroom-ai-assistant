@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-# Based on the dry-run scan (46 detected species).
+# Species-level safety labels are intentionally explicit: known edible entries may
+# inform the UI, but they never become a consumption recommendation by themselves.
 SPECIES_EDIBILITY: Dict[str, str] = {
     "Agaricus_bisporus": "edible",
     "Agaricus_subrufescens": "edible",
@@ -18,6 +19,7 @@ SPECIES_EDIBILITY: Dict[str, str] = {
     "Auricularia_auricula": "edible",
     "Boletus_edulis": "edible",
     "Cantharellus_cibarius": "edible",
+    "Cantharellus_cinnabarinus": "edible",
     "Clitocybe_dealbata": "poisonous",
     "Conocybe_filaris": "poisonous",
     "Coprinus_comatus": "edible",
@@ -62,6 +64,7 @@ COMMON_NAMES: Dict[str, str] = {
     "Amanita_virosa": "Kegeliger Knollenblaetterpilz",
     "Boletus_edulis": "Steinpilz",
     "Cantharellus_cibarius": "Pfifferling",
+    "Cantharellus_cinnabarinus": "Roter Pfifferling",
     "Coprinus_comatus": "Schopftintling",
     "Cordyceps_sinensis": "Chinesischer Raupenpilz",
     "Flammulina_velutipes": "Samtfussruebling",
@@ -98,6 +101,8 @@ def _display_name(species_key: str) -> str:
 def _build_species_info() -> Dict[str, Dict[str, Any]]:
     info: Dict[str, Dict[str, Any]] = {}
     for species_key, edibility in SPECIES_EDIBILITY.items():
+        # `cookable` only means the dataset mapping marks the species as edible.
+        # The app still requires CV confidence and safety checks before showing anything user-facing.
         cookable = edibility == "edible"
         info[species_key] = {
             "scientific_name": species_key,

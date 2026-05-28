@@ -25,7 +25,7 @@ from utils import (
 )
 
 LOGGER = logging.getLogger("mushroom.app")
-EXAMPLES_DIR = Path(__file__).resolve().parent / "data" / "examples"
+EXAMPLES_DIR = Path(__file__).resolve().parent / "examples"
 
 DEFAULT_FEATURE_TEMPLATE = {
     "cap-diameter": 15.0,
@@ -398,6 +398,40 @@ def _truncate_sentences(text: object, max_sentences: int = 2, max_length: int = 
     return trimmed or _shorten_text(value, max_length=max_length)
 
 
+def _compact_nlp_explanation(text: object, main_pred: str | None, species_meta: Dict[str, object] | None, numeric_result: Dict[str, object]) -> str:
+    """Condense the NLP explanation for the summary card."""
+
+    compact = _truncate_sentences(text, max_sentences=2, max_length=155)
+    if compact == "—":
+        return compact
+
+    names: list[str] = []
+    if species_meta and species_meta.get("common_name"):
+        names.append(str(species_meta.get("common_name")).strip())
+    if main_pred:
+        names.append(str(main_pred).strip())
+        names.append(str(main_pred).replace("_", " ").strip())
+
+    for name in dict.fromkeys(name for name in names if name):
+        pattern = re.compile(rf"\b{re.escape(name)}\b", re.IGNORECASE)
+        seen = 0
+
+        def _replace(match: re.Match[str]) -> str:
+            nonlocal seen
+            seen += 1
+            return match.group(0) if seen == 1 else "the mushroom"
+
+        compact = pattern.sub(_replace, compact)
+
+    compact = re.sub(r"\s{2,}", " ", compact).strip(" ,;")
+    compact = re.sub(r"([.!?]\s+)the mushroom\b", r"\1The mushroom", compact, flags=re.IGNORECASE)
+
+    if not bool(numeric_result.get("numeric_evaluated", False)) and "numeric ml" not in compact.lower():
+        compact = f"{compact} Numeric ML was not evaluated because no structured traits were provided."
+
+    return compact
+
+
 def _escape_html(value: object) -> str:
     """Escape text for safe HTML rendering inside the summary card."""
 
@@ -441,9 +475,9 @@ def _section(title: str, rows: list[str], accent: str = "rgba(85,74,56,0.1)", ti
     """Render a named section for the summary card."""
 
     return (
-        f"<div style='margin-top:0.75rem;padding:0.8rem 0.9rem;border-radius:16px;"
-        f"background:{background};border:1px solid {accent};box-shadow:0 8px 18px rgba(54,45,28,0.05);'>"
-        f"<div style='font-size:1rem;font-weight:800;margin-bottom:0.4rem;color:{title_color};'>{_escape_html(title)}</div>"
+        f"<div style='margin-top:0.55rem;padding:0.7rem 0.8rem;border-radius:14px;"
+        f"background:{background};border:1px solid {accent};box-shadow:0 7px 16px rgba(54,45,28,0.045);'>"
+        f"<div style='font-size:0.98rem;font-weight:800;margin-bottom:0.3rem;color:{title_color};'>{_escape_html(title)}</div>"
         + "".join(rows)
         + "</div>"
     )
@@ -465,30 +499,7 @@ def build_result_summary(
 
     numeric_evaluated = bool(numeric_result.get("numeric_evaluated", False))
     numeric_feature_source = str(numeric_result.get("feature_source", "fallback"))
-    numeric_status_text = (
-        "Numeric model evaluated using manual / LLM-extracted features."
-        if numeric_evaluated
-        else "Numeric model not evaluated. Enable structured feature inputs to run the numeric model."
-    )
-    numeric_prediction_text = (
-        str(numeric_result.get("predicted_label")) if numeric_evaluated and numeric_result.get("predicted_label") is not None else "not evaluated"
-    )
-    numeric_probability_text = (
-        f"{float(numeric_result.get('edible_probability')):.2%}" if numeric_evaluated and numeric_result.get("edible_probability") is not None else "—"
-    )
-    explanation_status = "generated"
-    explanation_source = f"Prompt {advice.get('prompt_variant', 'B')}"
-    explanation_text = _truncate_sentences(advice.get("explanation"), max_sentences=2, max_length=160)
-    top3_items = []
-    for prediction in top_k_list[:3]:
-        species_name = str(prediction.get("class", "—"))
-        species_info = get_species_info(species_name)
-        if species_info and species_info.get("common_name"):
-            label = f"{species_info.get('common_name')} ({species_name})"
-        else:
-            label = species_name
-        top3_items.append(f"{label} ({float(prediction.get('confidence', 0.0)):.2%})")
-    top3_text = ", ".join(top3_items) if top3_items else "—"
+    explanation_text = _compact_nlp_explanation(advice.get("explanation"), main_pred, species_meta, numeric_result)
     species_mapping_text = cv_edibility or "—"
     if main_pred and species_meta and species_meta.get("common_name"):
         cv_prediction_text = (
@@ -510,36 +521,6 @@ def build_result_summary(
 
     sections = [
         _section(
-            "Computer Vision",
-            [
-                _row("Species", cv_prediction_text, value_html=True),
-                _row("CV confidence", cv_confidence_text),
-                _row("Top-3", top3_text),
-                _row("Mapping", species_mapping_text),
-            ],
-        ),
-        _section(
-            "Numeric ML",
-            [
-                _row("Status", numeric_status_text),
-                *([
-                    _row("Prediction", numeric_prediction_text),
-                    _row("Probability", numeric_probability_text),
-                    _row("Source", numeric_feature_source),
-                ] if numeric_evaluated else [
-                    _row("How to enable", "Add structured features or a detailed description to run the numeric model."),
-                ]),
-            ],
-        ),
-        _section(
-            "NLP",
-            [
-                _row("Status", explanation_status),
-                _row("Source", explanation_source),
-                _row("Summary", explanation_text),
-            ],
-        ),
-        _section(
             "Final Safety Decision",
             [
                 _row("Decision", final_decision_text),
@@ -550,18 +531,54 @@ def build_result_summary(
             title_color="#7a2e2e",
             background="rgba(122,46,46,0.06)",
         ),
+        _section(
+            "Computer Vision",
+            [
+                _row("Species", cv_prediction_text, value_html=True),
+                _row("CV confidence", cv_confidence_text),
+                _row("Mapping", species_mapping_text),
+            ],
+        ),
     ]
 
+    if numeric_evaluated:
+        numeric_section = _section(
+            "Numeric ML",
+            [
+                _row("Prediction", str(numeric_result.get("predicted_label")) if numeric_result.get("predicted_label") is not None else "—"),
+                _row(
+                    "Probability",
+                    f"{float(numeric_result.get('edible_probability')):.2%}" if numeric_result.get("edible_probability") is not None else "—",
+                ),
+                _row("Feature source", numeric_feature_source),
+            ],
+        )
+        sections.insert(2, numeric_section)
+
+    explanation_text = explanation_text if explanation_text != "—" else "Explanation generated from available model outputs."
+    nlp_paragraph = (
+        "<div class='nlp-paragraph'>"
+        f"{_escape_html(explanation_text)}"
+        "</div>"
+    )
+    sections.insert(
+        3 if numeric_evaluated else 2,
+        _section(
+            "NLP",
+            [nlp_paragraph],
+        ),
+    )
+
     disclaimer = (
-        "<div style='margin-top:0.9rem;padding:0.7rem 0.9rem;border-left:4px solid #7a5b2b;"
-        "background:rgba(122,91,43,0.08);border-radius:12px;color:#3a3124;'>"
+        "<div style='margin-top:0.6rem;padding:0.5rem 0.75rem;border-left:3px solid #8a6b3e;"
+        "background:rgba(122,91,43,0.06);border-radius:10px;color:#4a3f2e;font-size:0.88rem;line-height:1.35;'>"
         "Expert verification is required. This app does not provide a consumption recommendation."
         "</div>"
     )
 
     return (
         "<div class='summary-card'>"
-        f"<div style='margin-bottom:0.75rem;'>{badges}</div>"
+        f"<div style='margin-bottom:0.55rem;'>{badges}</div>"
         + "".join(sections)
         + disclaimer
         + "</div>"
@@ -778,49 +795,94 @@ def build_interface() -> gr.Blocks:
         margin: 0 auto;
     }
     .hero-card {
-        padding: 0.95rem 1.1rem;
-        border-radius: 22px;
+        padding: 0.85rem 1rem;
+        border-radius: 20px;
         background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(245,240,228,0.92));
         border: 1px solid rgba(85, 74, 56, 0.12);
         box-shadow: 0 12px 30px rgba(54, 45, 28, 0.08);
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.55rem;
     }
     .summary-card {
-        padding: 0.8rem 0.9rem;
-        border-radius: 18px;
+        padding: 0.72rem 0.82rem;
+        border-radius: 16px;
         background: rgba(255, 255, 255, 0.86);
         border: 1px solid rgba(85, 74, 56, 0.12);
         box-shadow: 0 10px 24px rgba(54, 45, 28, 0.07);
-        font-size: 0.95rem;
-        line-height: 1.45;
+        font-size: 0.94rem;
+        line-height: 1.4;
     }
     .summary-card h3 {
         margin-top: 0;
-        margin-bottom: 0.45rem;
+        margin-bottom: 0.35rem;
     }
     .summary-card strong {
         color: #2f281d;
     }
     .summary-card p {
-        margin-bottom: 0.35rem;
+        margin-bottom: 0.25rem;
+    }
+    .summary-card div {
+        overflow: visible;
     }
     .compact-accordion {
-        margin-top: 0.45rem;
+        margin-top: 0.3rem;
+        margin-bottom: 0.3rem;
         font-size: 0.92rem;
     }
+    .analyze-row {
+        justify-content: center;
+        margin-top: 0.15rem;
+        margin-bottom: 0.1rem;
+    }
     .analyze-button button {
-        min-height: 2.3rem !important;
-        padding: 0.3rem 0.85rem !important;
-        font-size: 0.94rem !important;
-        border-radius: 10px !important;
+        min-height: 46px !important;
+        min-width: 220px !important;
+        padding: 0.45rem 1rem !important;
+        font-size: 0.92rem !important;
+        border-radius: 12px !important;
+        box-shadow: 0 8px 18px rgba(54, 45, 28, 0.08);
     }
     .mini-muted {
-        color: rgba(58, 49, 36, 0.74);
-        font-size: 0.88rem;
+        color: rgba(58, 49, 36, 0.6);
+        font-size: 0.8rem;
+        line-height: 1.3;
+        margin-top: 0.1rem;
+        margin-bottom: 0.1rem;
+    }
+    .helper-note {
+        color: rgba(58, 49, 36, 0.62);
+        font-size: 0.8rem;
+        line-height: 1.35;
+        margin-top: 0.05rem;
+        margin-bottom: 0.12rem;
     }
     .technical-panel-title {
         font-size: 0.95rem;
         font-weight: 700;
+    }
+    .summary-card .nlp-paragraph {
+        margin-top: 0.05rem;
+        white-space: normal;
+        overflow: visible;
+        line-height: 1.38;
+        word-break: normal;
+    }
+    .compact-image {
+        margin-bottom: 0.28rem;
+    }
+    .compact-textbox {
+        margin-bottom: 0.2rem;
+    }
+    .compact-textbox textarea {
+        min-height: 90px !important;
+    }
+    .compact-numeric-accordion {
+        margin-top: 0.15rem;
+        margin-bottom: 0.25rem;
+    }
+    .compact-settings-accordion {
+        margin-top: 0.2rem;
+        margin-bottom: 0.2rem;
     }
     """
     example_images = [str(path) for path in sorted(EXAMPLES_DIR.glob("*")) if path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}]
@@ -838,16 +900,19 @@ def build_interface() -> gr.Blocks:
                 with gr.Column(scale=1, min_width=360):
                     image_input = gr.Image(
                         type="filepath",
-                        label="Upload mushroom photo",
+                        label="Pilzbild hochladen",
                         sources=["upload"],
+                        elem_classes=["compact-image"],
                     )
                     description_input = gr.Textbox(
                         label="Optional mushroom description",
                         placeholder="Example: Red cap with white spots, white stem, growing in the woods.",
                         lines=3,
+                        elem_classes=["compact-textbox"],
                     )
-                    with gr.Accordion("Numeric Model Inputs", open=False):
+                    with gr.Accordion("Numeric Model Inputs", open=False, elem_classes=["compact-accordion", "compact-numeric-accordion"]):
                         gr.Markdown("These structured mushroom traits are used by the Numeric ML model.")
+                        gr.Markdown("Optional: add structured traits to enable the Numeric ML model.", elem_classes=["helper-note"])
                         use_manual_structured_features_input = gr.Checkbox(
                             label="Use manual structured features for numeric model",
                             value=False,
@@ -875,7 +940,8 @@ def build_interface() -> gr.Blocks:
                                 spore_print_color_input = build_numeric_dropdown("spore-print-color", DEFAULT_FEATURE_TEMPLATE["spore-print-color"], info=NUMERIC_FIELD_HINTS["spore-print-color"])
                                 habitat_input = build_numeric_dropdown("habitat", DEFAULT_FEATURE_TEMPLATE["habitat"])
                                 season_input = build_numeric_dropdown("season", DEFAULT_FEATURE_TEMPLATE["season"], info=NUMERIC_FIELD_HINTS["season"])
-                    run_button = gr.Button("Analyze mushroom", variant="primary", elem_classes=["analyze-button"])
+                    with gr.Row(elem_classes=["analyze-row"]):
+                        run_button = gr.Button("Analyze mushroom", variant="primary", elem_classes=["analyze-button"])
                     gr.Markdown("<div class='mini-muted'>Use the manual inputs if you want the numeric model to run without OpenAI feature extraction.</div>")
                     if example_images:
                         gr.Examples(
@@ -885,7 +951,7 @@ def build_interface() -> gr.Blocks:
                             examples_per_page=4,
                         )
 
-                    with gr.Accordion("Advanced settings", open=False):
+                    with gr.Accordion("Advanced settings", open=False, elem_classes=["compact-accordion", "compact-settings-accordion"]):
                         api_key_input = gr.Textbox(label="OpenAI API key override", type="password", value="")
                         model_input = gr.Textbox(label="OpenAI model", value="gpt-4o-mini")
 

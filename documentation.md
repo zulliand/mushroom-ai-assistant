@@ -58,13 +58,15 @@ See `run_assistant()` in [`app.py`](app.py#L604).
 
 #### 2A.1 Data Source(s)
 
-| Entry | Source name or link | Type | Size | Role in this block |
-| --- | --- | --- | --- | --- |
-| 1 | UCI Mushroom Dataset | Structured CSV | classic tabular scale | Initial edible vs poisonous experiments |
-| 2 | Mushroom Edibility Classification Dataset | Structured CSV | 61,069 rows (used run) | Final Numeric ML training/evaluation |
-| 3 | User manual structured traits + LLM-extracted traits | Runtime structured input | per request | Inference-time optional Numeric ML input |
+| Entry | Source (file / location) | Type | Role in this block |
+| --- | --- | --- | --- |
+| 1 | `data/Mushroom data.csv` (UCI Mushroom Dataset) | Structured CSV (categorical) | Exploratory dataset used for early experiments, preprocessing validation and feature exploration. |
+| 2 | `data/secondary_data.csv` (Extended Mushroom Edibility Dataset) | Structured CSV (numerical + categorical traits) | Final dataset used to train and evaluate the deployed Numeric ML pipeline (deployed Random Forest). |
+| 3 | Runtime structured inputs | User-provided manual dropdowns and LLM-extracted JSON features (per inference) | Optional inference-time input source that enables the Numeric ML component when available. |
 
-Data references: [`data/secondary_data.csv`](data/secondary_data.csv), [`models/numeric_metrics.json`](models/numeric_metrics.json#L1)
+Data references: `data/Mushroom data.csv`, `data/secondary_data.csv`, and evaluation artifacts in `models/numeric_metrics.json`.
+
+Note: `data/Mushroom data.csv` functioned primarily as an exploratory resource; `data/secondary_data.csv` is the structured dataset used in the final numeric pipeline. Runtime user inputs (manual traits or LLM-extracted traits) are distinct from both and are only used at inference time when provided.
 
 #### 2A.2 Preprocessing and Features
 
@@ -109,9 +111,9 @@ See `extract_mushroom_features()` in [`llm.py`](llm.py#L134), `generate_mushroom
 #### 2B.1 Data Source(s)
 
 | Entry | Source name or link | Type | Size | Role in this block |
-| --- | --- | --- | --- | --- |
-| 1 | User text descriptions | Runtime text input | per request | Explanation context and optional feature extraction |
-| 2 | CV result payload | Structured model output | per inference | Species/confidence context for explanation |
+| --- | --- | --- | --- |
+| 1 | User text descriptions and uploaded images | Runtime text input + runtime images | per request | Explanation context and optional LLM-based feature extraction; uploaded images are used by CV inference (see 2C) |
+| 2 | CV result payload | Structured model output | per inference | Species/confidence context for explanation (CV models trained on local image datasets under `data/`) |
 | 3 | Numeric ML result payload (optional) | Structured model output | per inference | Auxiliary risk signal in explanation and safety wording |
 
 #### 2B.2 Preprocessing and Prompt Design
@@ -152,15 +154,17 @@ See `generate_mushroom_advice()` and prompt comparison in [`llm.py`](llm.py#L294
 
 ### 2C. Computer Vision (If selected)
 
-#### 2C.1 Data Source(s)
+### 2C.1 Data Source(s)
 
-| Entry | Source name or link | Type | Size | Role in this block |
-| --- | --- | --- | --- | --- |
-| 1 | Edible & Poisonous Mushroom Classification Dataset | Image dataset | binary split scale | Binary baseline model training |
-| 2 | Mushroom Species Image Dataset | Image dataset | 169 classes | Fine-grained species recognition training |
-| 3 | Local curated mushroom images | Runtime evaluation images | small curated set | Manual evaluation and deployment checks |
+| Entry | Source (file / location) | Type | Role in this block |
+| --- | --- | --- | --- |
+| 1 | Binary edible/poisonous image dataset — local folders `data/train`, `data/val`, `data/test` | Image dataset (binary labels) | Used for initial binary CV training and baseline evaluation (edible vs poisonous). |
+| 2 | Species-level image dataset — `data/species_images` and `data/raw/mushroom_species_recognition/merged_dataset` | Image dataset (fine-grained species folders) | Final species-recognition training and evaluation (multi-class, used for deployed species CV model). |
+| 3 | Local curated mushroom images | Runtime evaluation images | Small curated set used for manual evaluation and deployment checks |
 
-Data references: [`data/species_images`](data/species_images), [`models/species_cv_metrics.json`](models/species_cv_metrics.json#L1)
+Data references: `data/species_images/`, `data/train/`, `data/val/`, `data/test/`, and evaluation artifacts in `models/species_cv_metrics.json` and `models/cv_metrics.json`.
+
+Note: The CV blocks use locally stored image folders for training and evaluation; at inference, user-uploaded images are processed by the same CV models trained on the folders listed above.
 
 #### 2C.2 Preprocessing and Augmentation
 

@@ -401,9 +401,17 @@ def _truncate_sentences(text: object, max_sentences: int = 2, max_length: int = 
 def _compact_nlp_explanation(text: object, main_pred: str | None, species_meta: Dict[str, object] | None, numeric_result: Dict[str, object]) -> str:
     """Condense the NLP explanation for the summary card."""
 
-    compact = _truncate_sentences(text, max_sentences=2, max_length=155)
-    if compact == "—":
-        return compact
+    if text is None:
+        return "—"
+
+    value = str(text).strip()
+    if not value:
+        return "—"
+
+    sentences = re.split(r"(?<=[.!?])\s+", value)
+    compact = " ".join(sentence.strip() for sentence in sentences[:3] if sentence.strip())
+    if not compact:
+        return "—"
 
     names: list[str] = []
     if species_meta and species_meta.get("common_name"):
@@ -861,11 +869,27 @@ def build_interface() -> gr.Blocks:
         font-weight: 700;
     }
     .summary-card .nlp-paragraph {
+        display: block;
         margin-top: 0.05rem;
+        margin-bottom: 0;
         white-space: normal;
-        overflow: visible;
+        overflow: visible !important;
+        overflow-x: visible !important;
+        overflow-y: visible !important;
+        text-overflow: clip !important;
+        max-height: none !important;
         line-height: 1.38;
         word-break: normal;
+        overflow-wrap: anywhere;
+        word-wrap: break-word;
+    }
+    .summary-card .nlp-paragraph * {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        word-break: normal !important;
+        overflow-wrap: anywhere !important;
+        word-wrap: break-word !important;
     }
     .compact-image {
         margin-bottom: 0.28rem;

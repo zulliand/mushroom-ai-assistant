@@ -47,6 +47,9 @@ Responsibilities:
 - Block unsafe recommendations
 - Enforce conservative safety policies
 
+![CV and NLP inference without structured numeric inputs](docs/screenshots/CV_NLP.png)
+*Figure 2. CV and NLP inference without structured numeric features.*
+
 ---
 
 ## System Architecture
@@ -68,6 +71,9 @@ Safety Gating
  ↓
 Final Output
 ```
+
+![Full multimodal pipeline interface](docs/screenshots/CV_NLP_Numeric_Model_Input.png)
+*Figure 1. Full multimodal evaluation with manual structured inputs.*
 
 ---
 
@@ -98,9 +104,9 @@ The project intentionally uses datasets that were not part of the semester exerc
 
 | Metric | Result |
 |---------|---------|
-| Top-1 Accuracy | 53.45% |
+| Top-1 Accuracy | 55.13% |
 | Top-3 Accuracy | 74.40% |
-| Top-5 Accuracy | 82.17% |
+| Top-5 Accuracy | 80.67% |
 
 The species recognition task contains 169 visually similar mushroom classes. Therefore, Top-k metrics provide more informative performance indicators than Top-1 accuracy alone.
 
@@ -118,6 +124,9 @@ Cooking recommendations are blocked when:
 - Safety thresholds are not met
 
 This conservative design prioritises safety over aggressive prediction behaviour.
+
+![Conservative safety handling under uncertainty](docs/screenshots/Description.png)
+*Figure 3. Conservative safety handling under low-confidence conditions.*
 
 ---
 
@@ -199,6 +208,15 @@ Configure:
 ```
 OPENAI_API_KEY
 ```
+
+Training vs Inference
+
+Training was performed using dedicated scripts (`train_cv.py`, `train_numeric.py`, `train_species_cv.py`) and produced the model artifacts stored in the `models/` directory. Inference and the deployed app rely on these pre-trained artifacts and are executed via `app.py`; the deployment does not retrain models at runtime.
+
+Acknowledgements / Submission
+
+- Jasmin Heierli — jasminh
+- Benjamin Kühnis — bkuehnis
 
 Do NOT commit:
 

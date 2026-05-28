@@ -1,238 +1,266 @@
-# Technical Documentation
+# Mushroom AI Assistant - Documentation
 
-## Architecture
+## Project Metadata
 
-The assistant is split into three cooperating stages:
+- Project title: Mushroom AI Assistant
+- Student: Andres Zulliger
+- GitHub repository URL: https://github.com/zulliand/mushroom-ai-assistant
+- Deployment URL: https://huggingface.co/spaces/zulliand/mushroom-ai-assistant
+- Submission date: 07 June 2026
 
-1. Computer vision classifies the uploaded mushroom image with a transfer-learning model.
-2. A structured-data classifier predicts edible vs poisonous from mushroom attributes.
-3. The LLM receives both outputs and produces a concise explanation, a safety warning, optional cooking suggestions, and a mandatory educational disclaimer.
+### Mandatory Setup Checks
 
-## Integration Rule
+- [x] At least 2 blocks selected
+- [x] Multiple and different data sources used
+- [x] Deployment URL provided
+- [x] Required GitHub users added to repository (`jasminh`, `bkuehnis`)
 
-The final answer is not produced by any one model alone. The LLM step explicitly combines the CV result and the structured-data result, and cooking advice is blocked unless both signals are highly confident.
+## Selected AI Blocks
 
-## Numeric Model
+- [x] ML Numeric Data
+- [x] NLP
+- [x] Computer Vision
 
-- Preprocessing handles categorical and numeric columns.
-- Logistic Regression and Random Forest are compared.
+Primary blocks used for core solution (choose 2):
+- Primary block 1: Computer Vision
+- Primary block 2: ML Numeric Data
 
-- ResNet18 transfer learning is used.
-- The backbone is frozen when pretrained weights are available.
+---
 
-- **Iteration 1 — binary CV baseline:** a binary edible/poisonous image classifier to validate pipeline and inference integration.
-- **Iteration 2 — 46-class species model:** expanded species labels to a mid-sized taxonomy to validate multi-class training and data pipeline.
+## 1. Project Foundation (Short)
 
-Fine-grained species recognition is inherently ambiguous from single images: many mushroom species share visual traits and intra-class variability (growth stages, lighting, occlusion). Top-3 and top-5 accuracy measure whether the correct species appears among the top candidates returned by the model — a practical and useful signal for downstream human-in-the-loop workflows and LLM-guided explanations.
+### 1.1 Problem Definition
 
-### Error analysis and safety rationale
+- Problem statement: Correct mushroom identification is difficult because many species are visually similar, and misidentification can cause severe health risks.
+- Goal: Build a multimodal assistant that combines Computer Vision, Numeric ML, and NLP to provide explainable, conservative, safety-first outputs.
+- Success criteria: Reliable species prediction pipeline, optional structured-feature risk signal, clear uncertainty communication, and conservative final safety behavior.
 
-- **Visual similarity:** Several species are visually similar (color variants, subtle cap/gill differences) which reduces single-image top-1 accuracy even when the model retains useful information in higher-ranked predictions.
-- **Domain shift:** Field photos from users or external sources often differ from the training distribution (camera, lighting, background), which can degrade performance.
+### 1.2 Integration Logic
 
-- CV: `Amanita_muscaria` detected with high confidence (e.g., 79.5%).
-- Numeric: structured features converted from CSV indicate `edible` with 76.0% probability.
+- How the selected blocks interact: CV predicts species and confidence; Numeric ML provides an auxiliary edible/poisonous signal when structured mushroom traits are available; NLP explains outputs and uncertainty; safety logic combines these signals conservatively.
+- Data and output flow between blocks:
+  1. User uploads mushroom image.
+  2. Computer Vision predicts species and confidence.
+  3. Structured mushroom traits (manual or LLM-extracted) optionally feed Numeric ML.
+  4. Safety logic combines CV, Numeric ML (if available), and species mapping.
+  5. NLP generates explanation and warning text.
 
-- The app expects `models/mushroom_rf.pkl` and `models/mushroom_cv.pt` to exist.
-- OpenAI is optional at runtime; if no key is available, the app falls back to a deterministic safety-focused response.
+See `run_assistant()` in [`app.py`](app.py#L604).
 
- ## Project Metadata
+![Full multimodal pipeline interface](docs/screenshots/CV_NLP_Numeric_Model_Input.png)
+*Figure 1. Full multimodal evaluation with manual structured inputs.*
 
- - Project title: Mushroom AI Assistant
- - Student: Andre (repository owner)
- - GitHub repository URL: (replace with repository URL)
- - Deployment URL: (replace with deployment URL if available)
- - Submission date: 2026-05-26
+---
 
- ### Mandatory Setup Checks
+## 2. Block Documentation
 
- - [x] At least 2 blocks selected
- - [x] Multiple and different data sources used
- - [ ] Deployment URL provided
- - [ ] Required GitHub users added to repository (`jasminh`, `bkuehnis`)
+### 2A. ML Numeric Data (If selected)
 
- ## Selected AI Blocks
+#### 2A.1 Data Source(s)
 
- - [x] ML Numeric Data
- - [x] NLP
- - [x] Computer Vision
+| Entry | Source name or link | Type | Size | Role in this block |
+| --- | --- | --- | --- | --- |
+| 1 | UCI Mushroom Dataset | Structured CSV | classic tabular scale | Initial edible vs poisonous experiments |
+| 2 | Mushroom Edibility Classification Dataset | Structured CSV | 61,069 rows (used run) | Final Numeric ML training/evaluation |
+| 3 | User manual structured traits + LLM-extracted traits | Runtime structured input | per request | Inference-time optional Numeric ML input |
 
- Primary blocks used for core solution:
- - Primary block 1: Computer Vision (species recognition)
- - Primary block 2: ML Numeric Data (structured edible/poisonous prediction)
+Data references: [`data/secondary_data.csv`](data/secondary_data.csv), [`models/numeric_metrics.json`](models/numeric_metrics.json#L1)
 
+#### 2A.2 Preprocessing and Features
 
- ---
+- Cleaning steps: categorical normalization, alias mapping, feature ordering.
+- Preprocessing steps: tabular feature encoding and pipeline-based transformation before model inference.
+- Feature engineering and selection: structured mushroom traits such as cap shape/color, gill attributes, stem features, habitat, season, bruises/bleeding.
 
- ## 1. Project Foundation (Short)
+See `predict_numeric_sample()` in [`app.py`](app.py#L296).
 
- ### 1.1 Problem Definition
- - Problem statement: Provide an integrated assessment of mushroom safety by combining image-based species recognition, structured-feature-based edible/poisonous prediction, and an LLM explanation/safety layer.
- - Goal: Produce explainable, safety-first advice that avoids recommending cooking when models disagree or confidence is low.
- - Success criteria: Working Gradio app (`app.py`) that accepts an image and structured JSON features, returns CV predictions (top-k), numeric prediction, LLM explanation and a safety decision; top-1/top-3/top-5 metrics reported for CV model.
+#### 2A.3 Model Selection
 
- ### 1.2 Integration Logic
- - How the selected blocks interact: The Gradio app calls `run_assistant()` in [`app.py`](app.py) which: (1) runs CV inference (`train_cv.predict_image`), (2) runs numeric inference (`predict_numeric_sample` in `app.py` wrapping the numeric pipeline), and (3) calls the LLM (`llm.generate_mushroom_advice`) to combine signals and produce an explanation and safety advice.
- - Data and output flow between blocks: Uploaded image -> CV model -> species/top-k list. Structured JSON -> numeric pipeline -> edible probability. Both outputs -> LLM -> final summary and safety decision.
+- Models tested: Logistic Regression, Random Forest.
+- Why these models were chosen: Logistic Regression as linear baseline; Random Forest for nonlinear interactions common in categorical mushroom traits.
 
- ---
+#### 2A.4 Model Comparison and Iterations
 
- ## 2. Block Documentation
+| Iteration | Objective | Key changes | Models used | Main metric | Change vs previous |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Establish baseline | Basic preprocessing and baseline classifier | Logistic Regression | Accuracy / F1 | Baseline reference |
+| 2 | Improve nonlinear performance | Improved feature handling and tree ensemble | Random Forest | Accuracy / F1 | Stronger class separation |
+| 3 | Integrate in multimodal pipeline | Optional runtime use with manual/LLM traits | Random Forest (deployed) | Safety-consistent auxiliary signal | Avoids over-trusting standalone numeric output |
 
- ### 2A. ML Numeric Data (Selected)
+#### 2A.5 Evaluation and Error Analysis
 
- #### 2A.1 Data Source(s
- | Entry | Source name or link | Type | Size | Role in this block |
- | --- | --- | --- | --- | --- |
- | 1 | `data/Mushroom data.csv` (UCI Mushroom Classification) | CSV (tabular) | small (~8K rows) | Training and evaluation of the numeric edible/poisonous classifier |
+- Metrics used: accuracy, precision, recall, f1.
+- Final results: accuracy=1.0, precision=1.0, recall=1.0, f1=1.0 on the available evaluation split.
+- Error patterns and likely causes: near-perfect metrics suggest very separable data but also potential overfitting or limited generalization.
 
- #### 2A.2 Preprocessing and Features
- - Cleaning steps: categorical normalization and alias mapping (see `app.py` `normalize_feature_names`).
- - Preprocessing steps: one-hot / ordinal encoding as appropriate inside `train_numeric.py` preprocessing pipeline.
- - Feature engineering and selection: use provided mushroom attributes (cap_shape, odor, gill_color, habitat, etc.) in `NUMERIC_FEATURE_ORDER` within `app.py` and `train_numeric.py`.
+The Numeric ML component is therefore treated as a supportive signal within the multimodal system, not as a standalone safety-critical classifier.
 
- #### 2A.3 Model Selection
- - Models tested: Logistic Regression, Random Forest (see `train_numeric.py`).
- - Why these models were chosen: reliable baselines for tabular data, interpretable probabilities for the safety layer, and fast training for classroom experimentation.
+Source: [`models/numeric_metrics.json`](models/numeric_metrics.json#L1)
 
- #### 2A.4 Model Comparison and Iterations
- | Iteration | Objective | Key changes | Models used | Main metric | Change vs previous |
- | --- | --- | --- | --- | --- | --- |
- | 1 | Baseline numeric classifier | Basic preprocessing, logistic regression | LogisticRegression | F1 / accuracy | Baseline |
- | 2 | Improve robustness | Random Forest tested and tuned | RandomForest | F1 / accuracy | Improved recall/precision tradeoff |
+#### 2A.6 Integration with Other Block(s)
 
- #### 2A.5 Evaluation and Error Analysis
- - Metrics used: accuracy, F1, class probabilities (used as edible probability for safety decisions).
- - Final results: numeric model provides an edible probability used for safety comparisons (see `models/numeric_metrics.json`).
- - Error patterns and likely causes: structured features may be missing or noisy; structured model does not inspect images and can therefore disagree with CV when features are ambiguous or mis-entered.
+- Inputs received from other block(s): optional structured traits extracted from user text via NLP; species context from CV pipeline state.
+- Outputs provided to other block(s): edible/poisonous probability signal used by safety logic and summarized by NLP explanation output.
 
- #### 2A.6 Integration with Other Block(s)
- - Inputs received from other block(s): none (numeric model only consumes structured JSON features provided by the user/UI).
- - Outputs provided to other block(s: The numeric edible probability and predicted label are passed to the LLM and to the safety decision logic in `app.py`.
+See `extract_mushroom_features()` in [`llm.py`](llm.py#L134), `generate_mushroom_advice()` in [`llm.py`](llm.py#L294), and `run_assistant()` in [`app.py`](app.py#L604).
 
- ---
+### 2B. NLP (If selected)
 
- ### 2B. NLP (Selected)
+#### 2B.1 Data Source(s)
 
- #### 2B.1 Data Source(s)
- | Entry | Source name or link | Type | Size | Role in this block |
- | --- | --- | --- | --- | --- |
- | 1 | OpenAI API (runtime) | External API | N/A | Generates explanations, safety reasoning and cooking suggestions |
+| Entry | Source name or link | Type | Size | Role in this block |
+| --- | --- | --- | --- | --- |
+| 1 | User text descriptions | Runtime text input | per request | Explanation context and optional feature extraction |
+| 2 | CV result payload | Structured model output | per inference | Species/confidence context for explanation |
+| 3 | Numeric ML result payload (optional) | Structured model output | per inference | Auxiliary risk signal in explanation and safety wording |
 
- #### 2B.2 Preprocessing and Prompt Design
- - Text preprocessing: minimal — the LLM receives formatted text describing CV and numeric outputs.
- - Prompt design: see `llm.py` for prompt templates and the two prompt variants compared by `compare_prompt_strategies()`; prompts include CV top-k results, numeric edible probability and safety context.
+#### 2B.2 Preprocessing and Prompt Design
 
- #### 2B.3 Approach Selection
- - Approach used: Prompt engineering with OpenAI models (small, controlled prompts) and an internal prompt-variant comparator implemented in `llm.py`.
- - Alternatives considered: RAG or retrieval-based augmentation (not required for this project scope).
+- Text preprocessing: normalize user description text, pass concise structured context fields.
+- Prompt design or retrieval setup: strict prompt instructions, safety framing, JSON-oriented extraction for structured features, conservative fallback behavior.
 
- #### 2B.4 Comparison and Iterations
- | Iteration | Objective | Key changes | Model or prompt setup | Main metric or qualitative check | Change vs previous |
- | --- | --- | --- | --- | --- | --- |
- | 1 | Minimal safe explanation | Basic prompt with CV+numeric summary | OpenAI prompt A | Qualitative review | Baseline |
- | 2 | Improve clarity & safety | Add structured safety phrasing and context | OpenAI prompt B | Qualitative review & manual checks | Improved clarity |
+The NLP layer itself is not trained from scratch; it uses OpenAI models with prompt engineering and structured context injection.
 
- #### 2B.5 Evaluation and Error Analysis
- - Evaluation strategy: manual review of examples to ensure safe phrasing and correct inclusion of model outputs; optional A/B via `compare_prompt_strategies()`.
- - Results: LLM explanations are concise and include safety warnings when models disagree.
- - Error patterns: LLM may hallucinate extra facts if prompts are not tightly constrained; mitigated by including only model outputs and explicit instructions in the prompt templates (`llm.py`).
+#### 2B.3 Approach Selection
 
- #### 2B.6 Integration with Other Block(s)
- - Inputs received from other block(s): CV top-k results and numeric edible probability.
- - Outputs provided to other block(s): textual explanation, safety warning, and optional cooking suggestions (blocked when safety logic disables them).
+- Approach used: prompt engineering with OpenAI chat models for explanation generation and optional structured feature extraction.
+- Alternatives considered: prompt variants A and B for explanation quality and safety consistency.
 
- ---
+#### 2B.4 Comparison and Iterations
 
- ### 2C. Computer Vision (Selected)
+| Iteration | Objective | Key changes | Model or prompt setup | Main metric or qualitative check | Change vs previous |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Initial explanation behavior | Baseline prompt style | Prompt A | Qualitative safety/readability review | Baseline |
+| 2 | Improve consistency and safety language | Stricter instruction wording | Prompt B | Qualitative comparison across sample cases | More consistent and safety-focused output |
+| 3 | Add feature extraction role | Structured JSON extraction prompt | Prompt B + extraction schema | Valid extraction fields + robust fallback | Enables optional Numeric ML input without manual-only dependency |
 
- #### 2C.1 Data Source(s
- | Entry | Source name or link | Type | Size | Role in this block |
- | --- | --- | --- | --- | --- |
- | 1 | Edible & Poisonous Mushroom Classification Dataset | Image folders | (project-local) | Initial binary CV baseline (edible/poisonous) |
- | 2 | Kaggle Mushroom species recognition dataset (merged) | Image folders | large (~720k images raw, filtered & limited) | Final species recognition training (169 classes; data limited for experiments) |
- | 3 | Local curated test images (user uploaded) | Image files | small | Runtime inference testing in `app.py` |
+See `generate_mushroom_advice()` and prompt comparison in [`llm.py`](llm.py#L294), [`llm.py`](llm.py#L376).
 
- #### 2C.2 Preprocessing and Augmentation
- - Image preprocessing: resize, normalization compatible with torchvision pretrained models (see `train_cv.py` building transforms).
- - Augmentation strategy: typical random crops, flips, color jitter used during training to improve generalization; defined in `train_cv.build_dataloaders()`.
+#### 2B.5 Evaluation and Error Analysis
 
- #### 2C.3 Model Selection
- - Vision model(s) used: `resnet18` (final), optional `efficientnet_b0` for experiments (see `train_cv.py` and `train_species_cv.py`).
- - Why these model(s) were chosen: lightweight, well-known transfer-learning backbones, good tradeoff between performance and resource requirements for classroom runs.
+- Evaluation strategy: qualitative comparison of prompt variants, safety review, and manual scenario testing.
+- Results: Prompt B produced more consistent and safety-focused explanations during qualitative evaluation.
+- Error patterns and likely causes: possible hallucinations or overconfident phrasing mitigated by strict prompts and conservative fallback messaging.
 
- #### 2C.4 Model Comparison and Iterations
- | Iteration | Objective | Key changes | Model(s) used | Main metric | Change vs previous |
- | --- | --- | --- | --- | --- | --- |
- | 1 | Binary baseline | Train edible/poisonous classifier | ResNet18 | accuracy | Baseline |
- | 2 | Mid-sized species model | 46-class species classification | ResNet18 | top-1/top-3 | Improved multi-class handling |
- | 3 | Final species model | 169-class training, top-k evaluation | ResNet18 | top-1/top-3/top-5 | Final reported metrics (see below) |
+#### 2B.6 Integration with Other Block(s)
 
- #### 2C.5 Evaluation and Error Analysis
- - Metrics and/or visual checks: top-1, top-3, top-5 accuracies computed in `train_cv.evaluate()` and saved to `models/species_cv_metrics.json`.
- - Final results (reported):
-	 - Top-1 accuracy (test): 53.45%
-	 - Top-3 accuracy (test): 74.40%
-	 - Top-5 accuracy (test): 82.17%
- - Error patterns and limitations: visual confusion between similar species, domain shift for user images, and limited per-class samples for some rare species.
+- Inputs received from other block(s): CV prediction/confidence and optional Numeric ML probabilities.
+- Outputs provided to other block(s): explanation text, uncertainty communication, and optional structured feature extraction feeding Numeric ML.
 
- #### 2C.6 Integration with Other Block(s)
- - Inputs received from other block(s): none; CV operates on user-uploaded image.
- - Outputs provided to other block(s): top-k species predictions and confidences passed to `llm.py` and safety logic in `app.py`.
+![CV and NLP inference without structured numeric inputs](docs/screenshots/CV_NLP.png)
+*Figure 2. CV and NLP inference without structured numeric features.*
 
- ---
+### 2C. Computer Vision (If selected)
 
- ## 3. Deployment
+#### 2C.1 Data Source(s)
 
- - Deployment URL: (replace with deployed Space URL)
- - Main user flow: user opens the Gradio app, uploads an image and optionally fills structured JSON features; app returns CV top-k, numeric prediction, LLM explanation and safety decision.
- - Screenshot or short demo: (attach screenshots in repository or add link to hosted demo)
+| Entry | Source name or link | Type | Size | Role in this block |
+| --- | --- | --- | --- | --- |
+| 1 | Edible & Poisonous Mushroom Classification Dataset | Image dataset | binary split scale | Binary baseline model training |
+| 2 | Mushroom Species Image Dataset | Image dataset | 169 classes | Fine-grained species recognition training |
+| 3 | Local curated mushroom images | Runtime evaluation images | small curated set | Manual evaluation and deployment checks |
 
- ---
+Data references: [`data/species_images`](data/species_images), [`models/species_cv_metrics.json`](models/species_cv_metrics.json#L1)
 
- ## 4. Execution Instructions
+#### 2C.2 Preprocessing and Augmentation
 
- - Environment setup:
+- Image preprocessing: resizing, normalization, tensor conversion.
+- Augmentation strategy: random crops, horizontal flips, color jitter.
 
- ```bash
- python -m venv .venv
- .\\.venv\\Scripts\\Activate.ps1  # PowerShell
- pip install -r requirements.txt
- ```
+#### 2C.3 Model Selection
 
- - Data setup:
-	 - Place the UCI CSV at `data/Mushroom data.csv`.
-	 - Provide image datasets under `data/images/` or follow the species import pipeline (`build_species_csv_import.py`) to create `data/species_images/`.
+- Vision model(s) used: ResNet18 (deployed), EfficientNet-B0 (experimental comparison/iteration path).
+- Why these model(s) were chosen: strong transfer-learning baseline with manageable compute and stable fine-tuning behavior.
 
- - Training command(s) (do not retrain unless you intend to):
+#### 2C.4 Model Comparison and Iterations
 
- ```bash
- # Numeric model
- py train_numeric.py --data-path data/Mushroom\\ data.csv
+| Iteration | Objective | Key changes | Model(s) used | Main metric | Change vs previous |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Binary classification baseline | Edible vs poisonous setup | ResNet18 | Accuracy | Established baseline |
+| 2 | Species-level expansion | Multi-class species task | ResNet18 / EfficientNet path | Top-1 | Improved granularity |
+| 3 | Final fine-grained model | 169-class training with top-k evaluation | Final species CV model | Top-1/Top-3/Top-5 | Better practical retrieval via top-k |
 
- # CV species training (example; heavy compute)
- py train_species_cv.py --model-name resnet18 --epochs 15 --max-train-samples 30000 --max-val-samples 6000 --max-test-samples 6000
- ```
+See `predict_image()` in [`train_cv.py`](train_cv.py#L304).
 
- - Inference/run command(s):
+#### 2C.5 Evaluation and Error Analysis
 
- ```bash
- py app.py
- ```
+- Metrics and/or visual checks: top-1, top-3, top-5 accuracy; qualitative review of low-confidence examples.
+- Final results:
+  - top1_accuracy: 0.5513333333333333
+  - top3_accuracy: 0.744
+  - top5_accuracy: 0.8066666666666666
+  - test_loss: 1.9632646945317587
+- Error patterns and limitations: visually similar species, domain shift in user photos, and confidence sensitivity under clutter/lighting changes.
 
- - Reproducibility notes:
-	 - Checkpoints and metrics are saved under `models/` (see `models/species_cv_metrics.json` and `models/mushroom_species_cv_metadata.json`).
-	 - Do not commit large datasets — see `.gitignore` for excluded paths.
+Top-k metrics are emphasized because visually similar species often appear among top candidates even when top-1 is uncertain.
 
- ---
+Sources: [`models/species_cv_metrics.json`](models/species_cv_metrics.json#L1), [`models/cv_metrics.json`](models/cv_metrics.json#L1)
 
- ## 5. Optional Bonus Evidence
+#### 2C.6 Integration with Other Block(s)
 
- - [x] Third selected block implemented with strong quality (LLM-based explanations and safety layer)
- - [x] More than two data sources used with clear added value
- - [ ] A core section is done exceptionally well
- - [ ] Extended evaluation
- - [ ] Ethics, bias, or fairness analysis
- - [ ] Creative or exceptional use case
+- Inputs received from other block(s): none required for base CV inference.
+- Outputs provided to other block(s): species prediction and confidence feed safety logic and NLP explanation layer.
 
- Evidence for selected bonus items: combined LLM safety logic, top-k CV reporting, and numeric/CV disagreement handling implemented in `app.py` and `llm.py`.
+Safety mapping reference: [`species_info.py`](species_info.py#L1).
+
+![Conservative safety handling under uncertain conditions](docs/screenshots/Description.png)
+*Figure 3. Conservative safety handling under low-confidence conditions.*
+
+---
+
+## 3. Deployment
+
+- Deployment URL: [Hugging Face Deployment](https://huggingface.co/spaces/zulliand/mushroom-ai-assistant)
+- Main user flow: upload image -> CV species prediction -> optional structured traits (manual or LLM-extracted) -> optional Numeric ML signal -> safety logic -> NLP explanation.
+- Screenshot or short demo: see Figures 1-3 above.
+
+Guidance alignment: deployment is inference-only and usable through Gradio UI.
+
+---
+
+## 4. Execution Instructions
+
+- Environment setup:
+
+```bash
+pip install -r requirements.txt
+```
+
+- Data setup:
+  - Place required model artifacts in `models/`.
+  - Keep datasets under `data/` when running training locally.
+
+- Training command(s):
+
+```bash
+python train_cv.py
+python train_species_cv.py
+python train_numeric.py
+```
+
+- Inference/run command(s):
+
+```bash
+python app.py
+```
+
+- Reproducibility notes:
+  - Models are pre-trained and stored in the `models/` directory.
+  - Large datasets are excluded from the repository due to size limitations.
+  - The deployment performs inference only and does not retrain models.
+
+---
+
+## 5. Optional Bonus Evidence
+
+- [x] Third selected block implemented with strong quality
+- [x] More than two data sources used with clear added value
+- [x] Extended evaluation
+- [x] Ethics, bias, or fairness analysis
+- [ ] Creative or exceptional use case
+
+Evidence for selected bonus items:
+- Multimodal integration of CV, Numeric ML, and NLP in one coherent safety-oriented pipeline.
+- Multiple external datasets used across structured and visual tasks.
+- Extended evaluation with top-k CV metrics, prompt comparison, and low-confidence safety-case analysis.
+- Ethics/safety focus through conservative decision logic, uncertainty communication, and explicit non-consumption guidance.
